@@ -131,13 +131,12 @@ class TaskEventApp(object):
 
     def _retrieve_taskdef(self, taskId):
         #TODO: retry api call
-        #TODO: ssl error; fix me. InsecurePlatformWarning: A true SSLContext object is not available. This prevents urllib3 from configuring SSL appropriately and may cause certain SSL connections to fail. For more information, see https://urllib3.readthedocs.org/en/latest/security.html#insecureplatformwarning.
         #DEBUG: api call disabled
         taskDef = "TaskDef goes here"
         #taskDef = self.tc_queue.task(taskId)
         #TODO: validate response
         #DEBUG statement: please remove before release
-        #print json.dumps(status, sort_keys=True, indent=4)
+        debug_print (taskDef)
         return taskDef
 
     def _spawn_taskdef_worker(self, taskId):

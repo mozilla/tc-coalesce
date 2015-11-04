@@ -3,3 +3,6 @@ taskcluster
 kombu
 pytz
 gevent
+pyopenssl
+ndg-httpsclient
+pyasn1
