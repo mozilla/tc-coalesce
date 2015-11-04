@@ -13,7 +13,7 @@ def debug_print(msg):
     print msg
     # running in heroku causes stdio to be buffered therefore we flush
     sys.stdout.flush()
-    
+
 
 #TODO: move these to args and env options
 #TODO: add task-exception exchange
@@ -35,24 +35,24 @@ def get_env_args():
 def parse_args():
     #TODO: parse args and return them as options
     pass
-    
+
 class TcPulseConsumer(GenericConsumer):
     def __init__(self, exchanges, **kwargs):
         super(TcPulseConsumer, self).__init__(
             PulseConfiguration(**kwargs), exchanges, **kwargs)
 
 class TaskEventApp(object):
-    
+
     # pendingTasks is a dict where all pending tasks and their task definitions are kept
     # Tasks are added or removed based on msgs from task-pending, task-running, and task-exception
     # {'taskid': task_definition}
     pendingTasks = {}
-    
+
     listener = None
-    
+
     def __init__(self):
         pass
-    
+
     def run(self):
         #TODO: bind with better topic to limit queue
         self.listener = TcPulseConsumer(exchanges, callback=self._route_callback_handler, **consumer_args)
@@ -85,19 +85,23 @@ class TaskEventApp(object):
             message.ack()
         #DEBUG statement: please remove before release
         debug_print ("PendingTasks: %s" % (len(self.pendingTasks)))
-        
-        
-    
+
+
+
     def _add_task_callback(self, body, message, taskId):
         taskDef = self._retrieve_taskdef(taskId)
         #TODO: handle if task already exists
         self.pendingTasks[taskId] = taskDef
         message.ack()
-    
+
     def _remove_task_callback(self, body, message, taskId):
         #TODO: make idempotent; handle KeyError
-        del self.pendingTasks[taskId]
-        message.ack()
+        try:
+            del self.pendingTasks[taskId]
+        except:
+            pass
+        finally:
+            message.ack()
 
     def _retrieve_taskdef(self, taskId):
         #TODO: retry api call
@@ -109,7 +113,7 @@ class TaskEventApp(object):
         #DEBUG statement: please remove before release
         #print json.dumps(status, sort_keys=True, indent=4)
         return taskDef
-    
+
     def _spawn_taskdef_worker(self, taskId):
         """
         Spawn an async worker thread to fetch taskdef and fill in pendingTasks value
@@ -123,7 +127,7 @@ class TaskEventApp(object):
         Spawn an async worker thread to listen to pulse exchanges and add keys to dict
         """
         pass
-    
+
 class CoalescerGeneric(object):
     """
     Generic Coalescer object contains logic to build lists of tasks based on defined commonality
@@ -131,10 +135,10 @@ class CoalescerGeneric(object):
     These 'defined commonalities' will be the index key used to quickly retrieve lists via the wsgi REST api
     Multiple objects may be defined accommodate mulitple 'defined commonalities'
     """
-    
+
     def __init__(self):
         pass
-    
+
 
 def logging():
     #TODO: Setup logging facility to be compatible with heroku
