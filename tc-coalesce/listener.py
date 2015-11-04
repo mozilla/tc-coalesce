@@ -8,33 +8,36 @@ import taskcluster
 from mozillapulse.config import PulseConfiguration
 from mozillapulse.consumers import GenericConsumer
 
+class AuthenticationError(Exception):
+    pass
+
 #DEBUG statement: please remove before release
 def debug_print(msg):
     print msg
     # running in heroku causes stdio to be buffered therefore we flush
     sys.stdout.flush()
 
+class Options(object):
 
-#TODO: move these to args and env options
-#TODO: add task-exception exchange
-exchanges = ['exchange/taskcluster-queue/v1/task-pending','exchange/taskcluster-queue/v1/task-running']
-queue = taskcluster.Queue()
-#TODO: make perm coalescer service pulse creds
-consumer_args = {
-    'applabel': 'jwatkins@mozilla.com|pulse-test2',
-    'topic': ['#','#'],
-    'durable': True,
-    'user': '',
-    'password': ''
-}
+    options = {}
 
-def get_env_args():
-    pass
-    #TODO: get env args
+    def __init__(self):
+        self._parse_env()
+        self._parse_args()
 
-def parse_args():
-    #TODO: parse args and return them as options
-    pass
+    def _parse_env(self):
+        try:
+            self.options['user'] = os.environ['PULSE_USER']
+            self.options['passwd'] = os.environ['PULSE_PASSWD']
+        except KeyError:
+            raise AuthenticationError
+            #DEBUG statement: please remove before release
+            debug_print("Auth error")
+            sys.exit(1)
+
+    def _parse_args(self):
+        #TODO: parse args and return them as options
+        pass
 
 class TcPulseConsumer(GenericConsumer):
     def __init__(self, exchanges, **kwargs):
@@ -48,14 +51,37 @@ class TaskEventApp(object):
     # {'taskid': task_definition}
     pendingTasks = {}
 
+    # ampq/pulse listener
     listener = None
 
-    def __init__(self):
-        pass
+    #TODO: move these to args and env options
+    #TODO: add task-exception exchange
+    exchanges = ['exchange/taskcluster-queue/v1/task-pending','exchange/taskcluster-queue/v1/task-running']
+
+    #TODO: make perm coalescer service pulse creds
+    consumer_args = {
+        'applabel': 'jwatkins@mozilla.com|pulse-test2',
+        'topic': ['#','#'],
+        'durable': True,
+        'user': 'public',
+        'password': 'public'
+    }
+
+    # Setup task cluster queue object
+    tc_queue = taskcluster.Queue()
+
+    options = None
+
+    def __init__(self, options):
+        self.options = options
+        self.consumer_args['user'] = self.options['user']
+        self.consumer_args['password'] = self.options['passwd']
 
     def run(self):
         #TODO: bind with better topic to limit queue
-        self.listener = TcPulseConsumer(exchanges, callback=self._route_callback_handler, **consumer_args)
+        #DEBUG statement: please remove before release
+        debug_print(self.consumer_args)
+        self.listener = TcPulseConsumer(self.exchanges, callback=self._route_callback_handler, **self.consumer_args)
         while True:
             try:
                 self.listener.listen()
@@ -108,7 +134,7 @@ class TaskEventApp(object):
         #TODO: ssl error; fix me. InsecurePlatformWarning: A true SSLContext object is not available. This prevents urllib3 from configuring SSL appropriately and may cause certain SSL connections to fail. For more information, see https://urllib3.readthedocs.org/en/latest/security.html#insecureplatformwarning.
         #DEBUG: api call disabled
         taskDef = "TaskDef goes here"
-        #taskDef = queue.task(taskId)
+        #taskDef = self.tc_queue.task(taskId)
         #TODO: validate response
         #DEBUG statement: please remove before release
         #print json.dumps(status, sort_keys=True, indent=4)
@@ -145,10 +171,13 @@ def logging():
     pass
 
 def main():
+    options = Options()
+    #DEBUG statement: please remove before release
+    debug_print("Starting")
     #TODO: parse args
     #TODO: parse and load evn options
     #TODO: pass args and options
-    app = TaskEventApp()
+    app = TaskEventApp(options.options)
     app.run()
 
 if __name__ == '__main__':
