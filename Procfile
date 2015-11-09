@@ -1,2 +1,2 @@
-worker: python tc-coalesce/listener.py
-web: python tc-coalesce/web.py
+worker: python -u tc-coalesce/listener.py
+web: python -u tc-coalesce/web.py
