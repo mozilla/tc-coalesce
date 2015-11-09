@@ -116,6 +116,7 @@ class TaskEventApp(object):
             self._remove_task_callback(body, message, taskId)
         else:
             # TODO: Handle unknown states; for now just ack the msg
+            pass
         # DEBUG statement: please remove before release
         debug_print("PendingTasks: %s" % (len(self.pendingTasks)))
         message.ack()
@@ -123,6 +124,7 @@ class TaskEventApp(object):
     def _add_task_callback(self, body, message, taskId):
         # Insert taskId into pendingTask with None as place holder
         # TODO: handle if task already exists
+        taskDef = self._retrieve_taskdef(taskId)
         self.pendingTasks[taskId] = taskDef
 
     def _remove_task_callback(self, body, message, taskId):
