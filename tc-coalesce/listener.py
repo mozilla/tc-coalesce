@@ -1,7 +1,6 @@
 import traceback
 import sys
 import os
-import taskcluster
 
 from mozillapulse.config import PulseConfiguration
 from mozillapulse.consumers import GenericConsumer
@@ -73,8 +72,6 @@ class TaskEventApp(object):
         'password': 'public'
     }
 
-    # Setup task cluster queue object
-    tc_queue = taskcluster.Queue()
 
     options = None
 
@@ -138,7 +135,6 @@ class TaskEventApp(object):
         # TODO: retry api call
         # DEBUG: api call disabled
         taskDef = "TaskDef goes here"
-        # taskDef = self.tc_queue.task(taskId)
         # TODO: validate response
         # DEBUG statement: please remove before release
         return taskDef
