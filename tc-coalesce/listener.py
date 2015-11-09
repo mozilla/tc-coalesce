@@ -58,6 +58,9 @@ class TaskEventApp(object):
 
     # TODO: move these to args and env options
     # TODO: add task-exception exchange
+    # State transitions
+    # pending --> running
+    #         \-> exception
     exchanges = ['exchange/taskcluster-queue/v1/task-pending',
                  'exchange/taskcluster-queue/v1/task-running']
 
@@ -113,15 +116,14 @@ class TaskEventApp(object):
             self._remove_task_callback(body, message, taskId)
         else:
             # TODO: Handle unknown states; for now just ack the msg
-            message.ack()
         # DEBUG statement: please remove before release
         debug_print("PendingTasks: %s" % (len(self.pendingTasks)))
+        message.ack()
 
     def _add_task_callback(self, body, message, taskId):
-        taskDef = self._retrieve_taskdef(taskId)
+        # Insert taskId into pendingTask with None as place holder
         # TODO: handle if task already exists
         self.pendingTasks[taskId] = taskDef
-        message.ack()
 
     def _remove_task_callback(self, body, message, taskId):
         # TODO: make idempotent; handle KeyError
@@ -129,8 +131,6 @@ class TaskEventApp(object):
             del self.pendingTasks[taskId]
         except:
             pass
-        finally:
-            message.ack()
 
     def _retrieve_taskdef(self, taskId):
         # TODO: retry api call
@@ -139,7 +139,6 @@ class TaskEventApp(object):
         # taskDef = self.tc_queue.task(taskId)
         # TODO: validate response
         # DEBUG statement: please remove before release
-        debug_print(taskDef)
         return taskDef
 
     def _spawn_taskdef_worker(self, taskId):
@@ -172,6 +171,28 @@ class CoalescerGeneric(object):
         pass
 
 
+class TestCoalescer(CoalescerGeneric):
+    """
+    A simple test Coalescer object
+    """
+
+    # The coalesce_def contains the attributes for tasks to be matched up
+    # primary
+    #     .taskId
+    #         .runId
+    #             .workerGroup
+    #                 .workerId
+    #                     .provisionerId
+    #                         .workerType
+    #                             .schedulerId
+    #                                 .taskGroupId
+    #                                     .reserved
+    coalesce_def = {'topic_route': 'primary.'}
+
+    def __init__(self):
+        pass
+
+
 def logging():
     # TODO: Setup logging facility to be compatible with heroku
     pass
@@ -186,6 +207,7 @@ def main():
     # TODO: pass args and options
     app = TaskEventApp(options.options)
     app.run()
+    # graceful shutdown via SIGTERM
 
 if __name__ == '__main__':
     main()
