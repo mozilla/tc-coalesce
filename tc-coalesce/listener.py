@@ -1,6 +1,10 @@
 import traceback
 import sys
 import os
+import json
+import socket
+import asyncio
+import aiohttp
 
 from mozillapulse.config import PulseConfiguration
 from mozillapulse.consumers import GenericConsumer
@@ -44,49 +48,89 @@ class TcPulseConsumer(GenericConsumer):
         super(TcPulseConsumer, self).__init__(
             PulseConfiguration(**kwargs), exchanges, **kwargs)
 
+    def listen(self, callback=None, on_connect_callback=None):
+        while True:
+            consumer = self._build_consumer(
+                callback=callback,
+                on_connect_callback=on_connect_callback
+            )
+            with consumer:
+                self._drain_events_loop()
+
+    def _drain_events_loop(self):
+        while True:
+            try:
+                self.connection.drain_events(timeout=self.timeout)
+            except socket.timeout:
+                logging.warning("Timeout! Restarting pulse consumer.")
+                try:
+                    self.disconnect()
+                except Exception:
+                    logging.warning("Problem with disconnect().")
+                break
+
 
 class TaskEventApp(object):
 
-    # pendingTasks is a dict where all pending tasks and their task definitions
-    # are kept. Tasks are added or removed based on msgs from task-pending,
-    # task-running, and task-exception {'taskid': task_definition}
+    # pendingTasks is a dict where all pending tasks are kept along with the
+    # received amqp msg and taskdef. Tasks are added or removed based on msgs
+    # from task-pending, task-running, and task-exception
+    # {'taskId': {'task_def': 'def', 'task_msg': 'boby'}}
     pendingTasks = {}
 
     # ampq/pulse listener
     listener = None
 
-    # TODO: move these to args and env options
-    # TODO: add task-exception exchange
+    # stats is a dict where running statistical data is stored to be available
+    # via the api
+    stats = {'pendingTasks': 0,    # number of pending tasks
+             'coalesced_lists': 0, # number of coalesced lists
+             'unknown_tasks': 0,   # number of tasks seen missing from pending
+             'tasks_reran': 0      # number of tasks sent back to pending
+    }
+
+    # DEBUG: these are for debugging only.  Remove before release
+    task_unknown_state = {}
+    task_missing = []
+
     # State transitions
     # pending --> running
     #         \-> exception
     exchanges = ['exchange/taskcluster-queue/v1/task-pending',
-                 'exchange/taskcluster-queue/v1/task-running']
+                 'exchange/taskcluster-queue/v1/task-running',
+                 'exchange/taskcluster-queue/v1/task-exception']
 
+    # TODO: move these to args and env options
     # TODO: make perm coalescer service pulse creds
     consumer_args = {
         'applabel': 'jwatkins@mozilla.com|pulse-test2',
-        'topic': ['#', '#'],
+        'topic': ['#', '#', '#'],
         'durable': True,
         'user': 'public',
         'password': 'public'
     }
 
-
     options = None
 
-    def __init__(self, options):
+    coalesce_list = []
+    # coalesing machine
+    coalescer = None
+
+    def __init__(self, options, coalease_list):
         self.options = options
+        self.coalease_list = coalease_list
         self.consumer_args['user'] = self.options['user']
         self.consumer_args['password'] = self.options['passwd']
+        self.listener = TcPulseConsumer(self.exchanges,
+                                callback=self._route_callback_handler,
+                                **self.consumer_args)
+        self.coalescer = self._build_coalescers(self.coalease_list)
 
     def run(self):
         # TODO: bind with better topic to limit queue
         # DEBUG statement: please remove before release
         debug_print(self.consumer_args)
-        self.listener = TcPulseConsumer(self.exchanges,
-                                        callback=self._route_callback_handler,
-                                        **self.consumer_args)
+
         while True:
             try:
                 self.listener.listen()
@@ -104,8 +148,6 @@ class TaskEventApp(object):
         taskState = body['status']['state']
         taskId = body['status']['taskId']
         # DEBUG statement: please remove before release
-        debug_print("taskId: %s (%s)" % (taskId, taskState))
-        # DEBUG statement: please remove before release
         # print json.dumps(body, sort_keys=True, indent=4)
         if taskState == 'pending':
             self._add_task_callback(body, message, taskId)
@@ -113,23 +155,36 @@ class TaskEventApp(object):
             self._remove_task_callback(body, message, taskId)
         else:
             # TODO: Handle unknown states; for now just ack the msg
-            pass
+            # DEBUG: these are for debugging only.  Remove before release
+            self.task_unknown_state[taskId] = taskState
         # DEBUG statement: please remove before release
-        debug_print("PendingTasks: %s" % (len(self.pendingTasks)))
+        # debug_print("PendingTasks: %s" % (len(self.pendingTasks)))
         message.ack()
+        self.stats['pendingTasks'] = len(self.pendingTasks)
+        # DEBUG statement: please remove before release
+        debug_print("taskId: %s (%s) - PendingTasks: %s" % (taskId, taskState, len(self.pendingTasks)))
+        self._write_db()
 
     def _add_task_callback(self, body, message, taskId):
         # Insert taskId into pendingTask with None as place holder
         # TODO: handle if task already exists
         taskDef = self._retrieve_taskdef(taskId)
-        self.pendingTasks[taskId] = taskDef
+        # TODO: store msg timestamp in pendingTasks
+        if taskId in self.pendingTasks:
+            self.stats['tasks_reran'] += 1
+        self.pendingTasks[taskId] = { 'task_msg': body, 'task_def': taskDef }
+        # TODO: apply task to coalesce filters for insertion
+        # self.coalescer(taskId)
 
     def _remove_task_callback(self, body, message, taskId):
         # TODO: make idempotent; handle KeyError
         try:
             del self.pendingTasks[taskId]
+            # TODO: apply task to coalesce filters for extraction
         except:
-            pass
+            self.stats['unknown_tasks'] += 1
+            # DEBUG: these are for debugging only.  Remove before release
+            self.task_missing.append(taskId)
 
     def _retrieve_taskdef(self, taskId):
         # TODO: retry api call
@@ -138,6 +193,24 @@ class TaskEventApp(object):
         # TODO: validate response
         # DEBUG statement: please remove before release
         return taskDef
+
+    def _build_coalescers(self, coalease_list=None):
+        """
+        Import multiple coalescing objects
+        """
+        pass
+
+
+    def _write_db(self):
+        db = {'stats': self.stats,
+              'pendingTasks': self.pendingTasks,
+              'task_missing': self.task_missing,
+              'task_unknown_state': self.task_unknown_state,
+              'coalesce_list': self.coalesce_list
+        }
+        with open('data.txt', 'w') as outfile:
+            json.dump(db, outfile)
+
 
     def _spawn_taskdef_worker(self, taskId):
         """
@@ -203,7 +276,8 @@ def main():
     # TODO: parse args
     # TODO: parse and load evn options
     # TODO: pass args and options
-    app = TaskEventApp(options.options)
+    coalesce_obj_list = [TestCoalescer]
+    app = TaskEventApp(options.options, coalesce_obj_list)
     app.run()
     # graceful shutdown via SIGTERM
 

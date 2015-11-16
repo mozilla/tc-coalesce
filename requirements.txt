@@ -1,8 +1,4 @@
 mozillapulse
-taskcluster
 kombu
 pytz
-gevent
-pyopenssl
-ndg-httpsclient
-pyasn1
+aiohttp
