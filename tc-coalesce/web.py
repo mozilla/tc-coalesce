@@ -40,6 +40,21 @@ def stats():
     stats = ddata['stats']
     return flask.jsonify(**stats)
 
+@app.route('/v1/list/<provisionerid>/<workertype>')
+@async
+def list(provisionerid, workertype, buildtype):
+    """
+    GET: returns list
+    """
+    prefix = "%s.%s" % (provisionerid, workertype)
+    data = _get_db()
+    ddata = json.loads(data)
+    try:
+        taskId_list = { prefix: ddata['coalesce_list'][prefix] }
+    except KeyError as e:
+        flask.abort(404)
+    return flask.jsonify(**taskId_list)
+
 # DEBUG: remove before release
 @app.route('/v1/pending_status')
 @async
@@ -75,5 +90,3 @@ def _get_db():
 if __name__ == '__main__':
     # TODO: remove debug arg
     aio.run(app, host='0.0.0.0', debug=True)
-
-
