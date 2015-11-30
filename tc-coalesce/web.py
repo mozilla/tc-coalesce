@@ -73,6 +73,4 @@ if __name__ == '__main__':
                       decode_responses=True)
 
     # TODO: remove debug arg
-    app.run(host='0.0.0.0', debug=True)
-
-
+    app.run(host='0.0.0.0', debug=False)
