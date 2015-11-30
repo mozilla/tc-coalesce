@@ -4,6 +4,8 @@ import os
 import json
 import socket
 import logging
+import redis
+from urllib.parse import urlparse
 
 from stats import Stats
 from coalescer import CoalescingMachine
@@ -12,19 +14,11 @@ from mozillapulse.config import PulseConfiguration
 from mozillapulse.consumers import GenericConsumer
 
 
-class AuthenticationError(Exception):
-    pass
-
 class StateError(Exception):
     pass
 
+
 log = None
-
-def debug_print(msg):
-    log.debug(msg)
-    # running in heroku causes stdio to be buffered therefore we flush
-    sys.stdout.flush()
-
 
 class Options(object):
 
@@ -39,7 +33,12 @@ class Options(object):
             self.options['user'] = os.environ['PULSE_USER']
             self.options['passwd'] = os.environ['PULSE_PASSWD']
         except KeyError:
-            raise AuthenticationError
+            traceback.print_exc()
+            sys.exit(1)
+        try:
+            self.options['redis'] = urlparse(os.environ['REDIS_URL'])
+        except KeyError:
+            traceback.print_exc()
             sys.exit(1)
 
     def _parse_args(self):
@@ -86,8 +85,6 @@ class TaskEventApp(object):
                  'exchange/taskcluster-queue/v1/task-running',
                  'exchange/taskcluster-queue/v1/task-exception']
 
-    routing_keys = []
-
     # TODO: move these to args and env options
     # TODO: make perm coalescer service pulse creds
     consumer_args = {
@@ -103,11 +100,11 @@ class TaskEventApp(object):
     # Coalesing machine
     coalescer = None
 
-    def __init__(self, options, stats, coalescer):
+    def __init__(self, options, stats, coalescer, datastore):
         self.options = options
         self.stats = stats
         self.coalescer = coalescer
-        self.routing_keys = self.coalescer.get_routing_keys()
+        self.rds = datastore
         self.consumer_args['user'] = self.options['user']
         self.consumer_args['password'] = self.options['passwd']
         self.listener = TcPulseConsumer(self.exchanges,
@@ -123,6 +120,7 @@ class TaskEventApp(object):
             except KeyboardInterrupt:
                 # TODO: delete_queue doesn't work. fix me
                 # self.listener.delete_queue()
+                self.rds.flushdb()
                 sys.exit(1)
             except:
                 traceback.print_exc()
@@ -158,7 +156,7 @@ class TaskEventApp(object):
         message.ack()
         self.stats.notch('total_msgs_handled')
         # DEBUG statement: please remove before release
-        debug_print("taskId: %s (%s) - PendingTasks: %s" % (taskId, taskState, self.stats.get('pending_count')))
+        log.debug("taskId: %s (%s) - PendingTasks: %s" % (taskId, taskState,self.stats.get('pending_count')))
 
 
     def _add_task_callback(self, taskId, body):
@@ -167,21 +165,6 @@ class TaskEventApp(object):
     def _remove_task_callback(self, taskId, body):
         self.coalescer.remove_task(taskId, body)
 
-    def _spawn_taskdef_worker(self, taskId):
-        """
-        Spawn an async worker thread to fetch taskdef and fill in pendingTasks
-        value. Once worker has taskdef, Coalescer object is applied to possible
-        add taskId to a current 'defined commonality list' already indexed or
-        to build a new list
-        """
-        pass
-
-    def _spawn_listener_worker(self, taskId):
-        """
-        Spawn an async worker thread to listen to pulse exchanges and add keys
-        to dict
-        """
-        pass
 
 def setup_log():
     # TODO: pass options and check for log level aka debug or not
@@ -197,16 +180,18 @@ def setup_log():
 
 
 def main():
-    options = Options()
     setup_log()
-    # DEBUG statement: please remove before release
-    debug_print("Starting")
+    options = Options().options
+    log.info("Starting Coalescing Service")
     # TODO: parse args
-    # TODO: parse and load evn options
     # TODO: pass args and options
-    stats = Stats()
-    coalescer_machine = CoalescingMachine(stats)
-    app = TaskEventApp(options.options, stats, coalescer_machine)
+    # setup redis object
+    rds = redis.Redis(host=options['redis'].hostname,
+                      port=options['redis'].port,
+                      password=options['redis'].password)
+    stats = Stats(datastore=rds)
+    coalescer_machine = CoalescingMachine(datastore=rds, stats=stats)
+    app = TaskEventApp(options, stats, coalescer_machine, datastore=rds)
     app.run()
     # graceful shutdown via SIGTERM
 

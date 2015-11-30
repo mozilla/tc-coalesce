@@ -1,4 +1,5 @@
 mozillapulse
 kombu
 pytz
-aiohttp
+redis
+

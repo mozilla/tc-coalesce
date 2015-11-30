@@ -1,92 +1,78 @@
+import traceback
+import sys
+import os
 import flask
-from flask_aiohttp import AioHTTP
-from flask_aiohttp.helper import async, websocket
-import asyncio
-import aiohttp
+from flask import Flask, jsonify, Response
 import json
+import redis
+from urllib.parse import urlparse
 
 app = flask.Flask(__name__)
-aio = AioHTTP(app)
 
+prefix = 'coalescer.v1.'
 
-
-@app.route('/v1')
+@app.route('/')
 def root():
     """
     GET: Return an index of available api
     """
     # TODO: return an index on available api
-    return 'Index goes here'
+    return jsonify({'versions': ['v1']})
 
-@app.route('/v1/coalesce')
-@async
+@app.route('/v1/list')
 def coalasce_lists():
     """
     GET: returns a list of all coalesced objects load into the listener
     """
-    data = _get_db()
-    ddata = json.loads(data)
-    stats = { 'coalesce_list': ddata['coalesce_list'] }
-    return flask.jsonify(**stats)
+    list_keys_set = rds.smembers("coalescer.v1.list_keys")
+    if len(list_keys_set) == 0:
+        return jsonify(**{ 'coalescer.v1.list_keys' : []})
+    list_keys = [x for x in list_keys_set]
+    return jsonify(**{ 'coalescer.v1.list_keys' : list_keys})
 
 @app.route('/v1/stats')
-@async
 def stats():
     """
     GET: returns stats
     """
-    data = _get_db()
-    ddata = json.loads(data)
-    stats = ddata['stats']
+    pf_key = prefix + 'stats'
+    stats = rds.hgetall(pf_key)
     return flask.jsonify(**stats)
 
-@app.route('/v1/list/<provisionerid>/<workertype>')
-@async
-def list(provisionerid, workertype, buildtype):
+@app.route('/v1/list/<key>')
+def list(key):
     """
     GET: returns list
     """
-    prefix = "%s.%s" % (provisionerid, workertype)
-    data = _get_db()
-    ddata = json.loads(data)
-    try:
-        taskId_list = { prefix: ddata['coalesce_list'][prefix] }
-    except KeyError as e:
-        flask.abort(404)
-    return flask.jsonify(**taskId_list)
+    pf_key = prefix + 'lists.' + key
+    coalesced_list = rds.lrange(pf_key, start=0, end=-1)
+    return jsonify(**{ key : coalesced_list})
 
 # DEBUG: remove before release
 @app.route('/v1/pending_status')
-@async
 def pending_status():
     """
     GET: return list of pending tasks
     """
-    data = json.loads(_get_db())
-    pt = data['pendingTasks'].keys()
-    return flask.jsonify(**{"pendingTasks": [x for x in pt]})
+    pending_tasks_set = rds.smembers("coalescer.v1.pendingTasks")
+    pending_tasks_list = [x for x in pending_tasks_set]
+    return jsonify(**{ 'pendingTasks' : pending_tasks_list})
 
-# DEBUG: remove before release
-@app.route('/v1/db')
-@async
-def db():
-    """
-    GET: return entire datastore json (for debugging only)
-    """
-    data = _get_db()
-    return flask.jsonify(**json.loads(data))
-
-def _get_db():
-    """
-    Retrieve simple json datastore.  To be replaced with a real inter dyno
-    data share method
-    """
-    with open('data.txt', 'r') as f:
-        data = f.read()
-    f.close()
-    return data
 
 
 if __name__ == '__main__':
+    try:
+        redis_url = urlparse(os.environ['REDIS_URL'])
+    except KeyError:
+        traceback.print_exc()
+        sys.exit(1)
+
+    rds = redis.Redis(host=redis_url.hostname,
+                      port=redis_url.port,
+                      password=redis_url.password,
+                      decode_responses=True)
+
     # TODO: remove debug arg
-    aio.run(app, host='0.0.0.0', debug=True)
+    app.run(host='0.0.0.0', debug=True)
+
+
