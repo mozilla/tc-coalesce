@@ -5,7 +5,7 @@ import flask
 from flask import Flask, jsonify, Response
 import json
 import redis
-from urllib.parse import urlparse
+from urlparse import urlparse
 
 app = flask.Flask(__name__)
 

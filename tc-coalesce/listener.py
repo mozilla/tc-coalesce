@@ -5,7 +5,7 @@ import json
 import socket
 import logging
 import redis
-from urllib.parse import urlparse
+from urlparse import urlparse
 
 from stats import Stats
 from coalescer import CoalescingMachine
