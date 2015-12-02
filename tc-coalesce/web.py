@@ -11,6 +11,17 @@ app = flask.Flask(__name__)
 
 prefix = 'coalescer.v1.'
 
+try:
+    redis_url = urlparse(os.environ['REDIS_URL'])
+except KeyError:
+    traceback.print_exc()
+    sys.exit(1)
+
+rds = redis.Redis(host=redis_url.hostname,
+                  port=redis_url.port,
+                  password=redis_url.password,
+                  decode_responses=True)
+
 @app.route('/')
 def root():
     """
@@ -61,16 +72,5 @@ def pending_status():
 
 
 if __name__ == '__main__':
-    try:
-        redis_url = urlparse(os.environ['REDIS_URL'])
-    except KeyError:
-        traceback.print_exc()
-        sys.exit(1)
-
-    rds = redis.Redis(host=redis_url.hostname,
-                      port=redis_url.port,
-                      password=redis_url.password,
-                      decode_responses=True)
-
     # TODO: remove debug arg
     app.run(host='0.0.0.0', debug=False)
