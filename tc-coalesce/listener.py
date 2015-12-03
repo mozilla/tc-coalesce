@@ -88,7 +88,7 @@ class TaskEventApp(object):
     # TODO: move these to args and env options
     # TODO: make perm coalescer service pulse creds
     consumer_args = {
-        'applabel': 'jwatkins@mozilla.com|pulse-test2',
+        'applabel': 'releng-tc-coalesce',
         'topic': ['#', '#', '#'],
         'durable': True,
         'user': 'public',
@@ -104,6 +104,8 @@ class TaskEventApp(object):
         self.options = options
         self.stats = stats
         self.coalescer = coalescer
+        route_key = coalescer.get_route_key()
+        self.consumer_args['topic'] = [route_key] * len(self.exchanges)
         self.rds = datastore
         self.consumer_args['user'] = self.options['user']
         self.consumer_args['password'] = self.options['passwd']
