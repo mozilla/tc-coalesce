@@ -9,7 +9,7 @@ from urlparse import urlparse
 
 app = flask.Flask(__name__)
 
-prefix = 'coalescer.v1.'
+pf = "index.gecko.v2."
 
 try:
     redis_url = urlparse(os.environ['REDIS_URL'])
@@ -35,18 +35,18 @@ def coalasce_lists():
     """
     GET: returns a list of all coalesced objects load into the listener
     """
-    list_keys_set = rds.smembers("coalescer.v1.list_keys")
+    list_keys_set = rds.smembers(pf + "list_keys")
     if len(list_keys_set) == 0:
-        return jsonify(**{ 'coalescer.v1.list_keys' : []})
+        return jsonify(**{ pf + 'list_keys' : []})
     list_keys = [x for x in list_keys_set]
-    return jsonify(**{ 'coalescer.v1.list_keys' : list_keys})
+    return jsonify(**{ pf + 'list_keys' : list_keys})
 
 @app.route('/v1/stats')
 def stats():
     """
     GET: returns stats
     """
-    pf_key = prefix + 'stats'
+    pf_key = pf + 'stats'
     stats = rds.hgetall(pf_key)
     return flask.jsonify(**stats)
 
@@ -55,7 +55,7 @@ def list(key):
     """
     GET: returns list
     """
-    pf_key = prefix + 'lists.' + key
+    pf_key = pf + 'lists.' + key
     coalesced_list = rds.lrange(pf_key, start=0, end=-1)
     return jsonify(**{ key : coalesced_list})
 
@@ -65,9 +65,9 @@ def pending_status():
     """
     GET: return list of pending tasks
     """
-    pending_tasks_set = rds.smembers("coalescer.v1.pendingTasks")
+    pending_tasks_set = rds.smembers( pf + "pending_tasks")
     pending_tasks_list = [x for x in pending_tasks_set]
-    return jsonify(**{ 'pendingTasks' : pending_tasks_list})
+    return jsonify(**{ 'pending_tasks' : pending_tasks_list})
 
 
 

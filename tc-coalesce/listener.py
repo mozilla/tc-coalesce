@@ -101,22 +101,35 @@ class TaskEventApp(object):
     # Coalesing machine
     coalescer = None
 
-    def __init__(self, options, stats, coalescer, datastore):
+    # pending_tasks is a dict where all pending tasks are kept along with the
+    # received amqp msg and taskdef. Tasks are added or removed based on msgs
+    # from task-pending, task-running, and task-exception
+    # { 'task_id':
+    #            {'task_msg_body': body,
+    #             'task_route_key': primary_route_key,
+    #             'task_optional_routes': [optional_routes]
+    #            }
+    pending_tasks = {}
+
+    def __init__(self, redis_prefix, options, stats, datastore):
+        self.pf = redis_prefix
         self.options = options
         self.stats = stats
-        self.coalescer = coalescer
-        route_key = coalescer.get_route_key()
+        self.coalescer = CoalescingMachine(self.pending_tasks,
+                                           redis_prefix,
+                                           datastore,
+                                           stats=stats)
+        route_key = "route." + redis_prefix + "#"
         self.consumer_args['topic'] = [route_key] * len(self.exchanges)
         self.rds = datastore
         self.consumer_args['user'] = self.options['user']
         self.consumer_args['password'] = self.options['passwd']
+        log.info("Binding to queue with route key: %s" % (route_key))
         self.listener = TcPulseConsumer(self.exchanges,
                                 callback=self._route_callback_handler,
                                 **self.consumer_args)
 
     def run(self):
-        # TODO: bind with better topic to limit queue
-
         while True:
             try:
                 self.listener.listen()
@@ -156,22 +169,45 @@ class TaskEventApp(object):
         taskState = body['status']['state']
         taskId = body['status']['taskId']
         if taskState == 'pending':
-            self._add_task_callback(taskId, body)
+            self._add_task_callback(taskId, body, message)
         elif taskState == 'running' or taskState == 'exception':
-            self._remove_task_callback(taskId, body)
+            self._remove_task_callback(taskId)
         else:
             raise StateError
         message.ack()
         self.stats.notch('total_msgs_handled')
         # DEBUG statement: please remove before release
-        log.debug("taskId: %s (%s) - PendingTasks: %s" % (taskId, taskState,self.stats.get('pending_count')))
+        log.debug("taskId: %s (%s) - PendingTasks: %s" % (taskId, taskState, self.stats.get('pending_count')))
 
 
-    def _add_task_callback(self, taskId, body):
-        self.coalescer.insert_task(taskId, body)
+    def _add_task_callback(self, taskId, body, message):
+        primary_route = message.delivery_info['routing_key']
+        optional_routes = message.headers['CC']
+        if taskId in self.pending_tasks:
+            self.stats.notch('tasks_reran')
 
-    def _remove_task_callback(self, taskId, body):
-        self.coalescer.remove_task(taskId, body)
+        # Insert task in to a master list for pending tasks
+        self.pending_tasks[taskId] = {'task_msg_body': body,
+                                        'task_route_key': primary_route,
+                                        'task_optional_routes': optional_routes
+                                        }
+        # Keep a running state of pending tasks in redis
+        # TODO: store as hashs
+        self.rds.sadd(self.pf + 'pending_tasks', taskId)
+        self.stats.set('pending_count', len(self.pending_tasks))
+        self.coalescer.insert_task(taskId)
+
+    def _remove_task_callback(self, taskId):
+        if taskId in self.pending_tasks:
+            self.coalescer.remove_task(taskId)
+        else:
+            self.stats.notch('unknown_tasks')
+            return
+
+        del self.pending_tasks[taskId]
+        # TODO: store as hashs
+        self.rds.srem(self.pf + 'pending_tasks', taskId)
+        self.stats.set('pending_count', len(self.pending_tasks))
 
 
 def setup_log():
@@ -193,13 +229,17 @@ def main():
     log.info("Starting Coalescing Service")
     # TODO: parse args
     # TODO: pass args and options
+
+    # prefix for all redis keys
+    # redis_prefix = "coalesce.v1."
+    redis_prefix = "index.gecko.v2."
+
     # setup redis object
     rds = redis.Redis(host=options['redis'].hostname,
                       port=options['redis'].port,
                       password=options['redis'].password)
-    stats = Stats(datastore=rds)
-    coalescer_machine = CoalescingMachine(datastore=rds, stats=stats)
-    app = TaskEventApp(options, stats, coalescer_machine, datastore=rds)
+    stats = Stats(redis_prefix, datastore=rds)
+    app = TaskEventApp(redis_prefix, options, stats, datastore=rds)
     signal.signal(signal.SIGTERM, signal_term_handler)
     app.run()
     # graceful shutdown via SIGTERM

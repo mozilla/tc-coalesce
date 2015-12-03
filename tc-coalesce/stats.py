@@ -1,7 +1,7 @@
 
 class Stats(object):
 
-    rds_pf = "coalescer.v1.stats"
+    pf = "default.stats"
 
     # stats is a dict where running statistical data is stored to be available
     # via the api
@@ -13,21 +13,22 @@ class Stats(object):
              'total_msgs_handled': 0
     }
 
-    def __init__(self, datastore):
+    def __init__(self, redis_prefix, datastore):
+        self.pf = redis_prefix + "stats"
         self.rds = datastore
         for key in self.stats.keys():
-            self.rds.hset(self.rds_pf, key, self.stats[key])
+            self.rds.hset(self.pf, key, self.stats[key])
 
     def notch(self, counter):
         self.stats[counter] += 1
-        self.rds.hset(self.rds_pf, counter, self.stats[counter])
+        self.rds.hset(self.pf, counter, self.stats[counter])
 
     def get(self, stat_name):
         return self.stats[stat_name]
 
     def set(self, stat_name, stat):
         self.stats[stat_name] = stat
-        self.rds.hset(self.rds_pf, stat_name, stat)
+        self.rds.hset(self.pf, stat_name, stat)
 
     def dump(self):
         return self.stats
