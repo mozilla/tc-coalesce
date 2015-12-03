@@ -5,6 +5,7 @@ import json
 import socket
 import logging
 import redis
+import signal
 from urlparse import urlparse
 
 from stats import Stats
@@ -120,13 +121,18 @@ class TaskEventApp(object):
             try:
                 self.listener.listen()
             except KeyboardInterrupt:
-                # TODO: delete_queue doesn't work. fix me
-                # self.listener.delete_queue()
-                self.rds.flushdb()
-                sys.exit(1)
+                # Handle both SIGTERM and SIGINT
+                self._graceful_shutdown()
             except:
                 traceback.print_exc()
 
+    def _graceful_shutdown(self):
+        log.info("Gracefully shutting down")
+        log.info("Deleting Pulse queue")
+        self.listener.delete_queue()
+        log.info("Flushing Redis keys")
+        self.rds.flushdb()
+        sys.exit(1)
 
     def delete_queue(self):
         self._check_params()
@@ -194,8 +200,13 @@ def main():
     stats = Stats(datastore=rds)
     coalescer_machine = CoalescingMachine(datastore=rds, stats=stats)
     app = TaskEventApp(options, stats, coalescer_machine, datastore=rds)
+    signal.signal(signal.SIGTERM, signal_term_handler)
     app.run()
     # graceful shutdown via SIGTERM
+
+def signal_term_handler(signal, frame):
+    log.info("Handling signal: term")
+    raise KeyboardInterrupt
 
 if __name__ == '__main__':
     main()
