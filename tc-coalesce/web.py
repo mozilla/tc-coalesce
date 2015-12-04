@@ -39,7 +39,7 @@ def coalasce_lists():
     if len(list_keys_set) == 0:
         return jsonify(**{ pf + 'list_keys' : []})
     list_keys = [x for x in list_keys_set]
-    return jsonify(**{ pf + 'list_keys' : list_keys})
+    return jsonify(**{ pf : list_keys})
 
 @app.route('/v1/stats')
 def stats():
