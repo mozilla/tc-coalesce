@@ -21,26 +21,20 @@ class CoalescingMachine(object):
         self.stats = stats
 
     def insert_task(self, taskId):
-        coalesce_key = self._get_coalesce_key(taskId)
-        self.rds.sadd(self.pf + "list_keys", coalesce_key)
-        self.rds.rpush(self.pf + "lists." + coalesce_key, taskId)
+        for coalesce_key in self._get_coalesce_key(taskId):
+            self.rds.sadd(self.pf + "list_keys", coalesce_key)
+            self.rds.rpush(self.pf + "lists." + coalesce_key, taskId)
 
     def remove_task(self, taskId):
-        coalesce_key = self._get_coalesce_key(taskId)
-        self.rds.lrem(self.pf + 'lists.' + coalesce_key, taskId, num=0)
-        if self.rds.llen(self.pf + 'lists.' + coalesce_key) == 0:
-            self.rds.srem(self.pf + "list_keys", coalesce_key)
+        for coalesce_key in self._get_coalesce_key(taskId):
+            self.rds.lrem(self.pf + 'lists.' + coalesce_key, taskId, num=0)
+            if self.rds.llen(self.pf + 'lists.' + coalesce_key) == 0:
+                self.rds.srem(self.pf + "list_keys", coalesce_key)
 
     def _get_coalesce_key(self, taskId):
-        return "fakekey"
-
-    def _parse_routes(self, taskId):
-        # TODO: uses this to get coalescing key when coalesce key in routes
-        taskDef = self.pendingTasks[taskId]['task_def']
-        for route in taskDef['routes']:
-            if self.rds_prefix == route[:len(self.rds_prefix)]:
-                coalesce_key = route[len(self.rds_prefix):]
-                break
-        return coalesce_key
-
-
+        for route in self.pending_tasks[taskId]['task_optional_routes']:
+            # strip 'route.'
+            route = route[6:]
+            if self.pf == route[:len(self.pf)]:
+                coalesce_key = route[len(self.pf):]
+                yield coalesce_key
