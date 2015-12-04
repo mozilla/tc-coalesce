@@ -230,9 +230,8 @@ def main():
     # TODO: parse args
     # TODO: pass args and options
 
-    # prefix for all redis keys
-    # redis_prefix = "coalesce.v1."
-    redis_prefix = "index.gecko.v2."
+    # prefix for all redis keys and route key
+    redis_prefix = "coalesce.v1."
 
     # setup redis object
     rds = redis.Redis(host=options['redis'].hostname,
