@@ -37,7 +37,7 @@ def coalasce_lists():
     """
     list_keys_set = rds.smembers(pf + "list_keys")
     if len(list_keys_set) == 0:
-        return jsonify(**{ pf + 'list_keys' : []})
+        return jsonify(**{ pf : []})
     list_keys = [x for x in list_keys_set]
     return jsonify(**{ pf : list_keys})
 
