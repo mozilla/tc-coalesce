@@ -23,7 +23,7 @@ class CoalescingMachine(object):
     def insert_task(self, taskId):
         for coalesce_key in self._get_coalesce_key(taskId):
             self.rds.sadd(self.pf + "list_keys", coalesce_key)
-            self.rds.rpush(self.pf + "lists." + coalesce_key, taskId)
+            self.rds.lpush(self.pf + "lists." + coalesce_key, taskId)
 
     def remove_task(self, taskId):
         for coalesce_key in self._get_coalesce_key(taskId):
