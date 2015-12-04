@@ -9,7 +9,7 @@ from urlparse import urlparse
 
 app = flask.Flask(__name__)
 
-pf = "index.gecko.v2."
+pf = "coalesce.v1."
 
 try:
     redis_url = urlparse(os.environ['REDIS_URL'])
