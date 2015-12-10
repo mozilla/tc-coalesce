@@ -108,14 +108,12 @@ class TaskEventApp(object):
     #            {'task_msg_body': body,
     #             'coalesce_key': coalesce_key
     #            }
-    pending_tasks = {}
 
     def __init__(self, redis_prefix, options, stats, datastore):
         self.pf = redis_prefix
         self.options = options
         self.stats = stats
         self.rds = datastore
-        self.pending_tasks = self._reload_pending_tasks(datastore)
         self.coalescer = CoalescingMachine(redis_prefix,
                                            datastore,
                                            stats=stats)
@@ -165,63 +163,21 @@ class TaskEventApp(object):
         """
         taskState = body['status']['state']
         taskId = body['status']['taskId']
-        # Extract and store first coalesce key that matches
+        # Extract first coalesce key that matches
         for route in message.headers['CC']:
             route = route[6:]
             if self.pf == route[:len(self.pf)]:
                 coalesce_key = route[len(self.pf):]
                 break
         if taskState == 'pending':
-            self._add_task_callback(taskId, body, message, coalesce_key)
+            self._add_task_callback(taskId, coalesce_key)
         elif taskState == 'running' or taskState == 'exception':
-            self._remove_task_callback(taskId, coalesce_key)
+            self.coalescer.insert_task(taskId, coalesce_key)
         else:
             raise StateError
         message.ack()
         self.stats.notch('total_msgs_handled')
-        # DEBUG statement: please remove before release
-        log.debug("taskId: %s (%s) - PendingTasks: %s" % (taskId, taskState, self.stats.get('pending_count')))
-
-
-    def _add_task_callback(self, taskId, body, message, coalesce_key):
-
-
-        # Insert task in to a master list for pending tasks
-        self.pending_tasks[taskId] = {'task_msg_body': body,
-                                      'coalesce_key': coalesce_key
-                                      }
-        # Keep a running state of pending tasks in redis
-        self.rds.hmset(self.pf + 'pending_tasks.' + taskId,
-                       'task_msg_body', body,
-                       'coalesce_key', coalesce_key)
-
-        self.stats.set('pending_count', len(self.pending_tasks))
-        self.coalescer.insert_task(taskId, coalesce_key)
-
-    def _remove_task_callback(self, taskId, coalesce_key):
-        if taskId in self.pending_tasks:
-            self.coalescer.remove_task(taskId, coalesce_key)
-        else:
-            self.stats.notch('unknown_tasks')
-            return
-
-        del self.pending_tasks[taskId]
-        self.rds.delete(self.pf + 'pending_tasks.' + taskId)
-        self.stats.set('pending_count', len(self.pending_tasks))
-
-    def _reload_pending_tasks(self, rds):
-        pending_tasks = {}
-        tasks = rds.smembers( self.pf + "pending_tasks")
-        for taskId in tasks:
-            body, coalesce_key = rds.hmget(self.pf + 'pending_tasks.' + taskId,
-                                           'task_msg_body',
-                                           'coalesce_key'
-                                          )
-            pending_tasks[taskId] = {'task_msg_body': body,
-                                     'coalesce_key': coalesce_key
-                                     }
-        return pending_tasks
-
+        log.debug("taskId: %s (%s)" % (taskId, taskState))
 
 def setup_log():
     # TODO: pass options and check for log level aka debug or not
