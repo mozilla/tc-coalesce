@@ -114,13 +114,14 @@ class TaskEventApp(object):
         self.pf = redis_prefix
         self.options = options
         self.stats = stats
+        self.rds = datastore
+        self.pending_tasks = self._reload_pending_tasks(datastore)
         self.coalescer = CoalescingMachine(self.pending_tasks,
                                            redis_prefix,
                                            datastore,
                                            stats=stats)
         route_key = "route." + redis_prefix + "#"
         self.consumer_args['topic'] = [route_key] * len(self.exchanges)
-        self.rds = datastore
         self.consumer_args['user'] = self.options['user']
         self.consumer_args['password'] = self.options['passwd']
         log.info("Binding to queue with route key: %s" % (route_key))
@@ -212,6 +213,19 @@ class TaskEventApp(object):
         self.rds.srem(self.pf + 'pending_tasks', taskId)
         self.rds.delete(self.pf + 'pending_tasks.' + taskId)
         self.stats.set('pending_count', len(self.pending_tasks))
+
+    def _reload_pending_tasks(self, rds):
+        pending_tasks = {}
+        tasks = rds.smembers( self.pf + "pending_tasks")
+        for taskId in tasks:
+            body, coalesce_key = rds.hmget(self.pf + 'pending_tasks.' + taskId,
+                                           'task_msg_body',
+                                           'coalesce_key'
+                                          )
+            pending_tasks[taskId] = {'task_msg_body': body,
+                                     'coalesce_key': coalesce_key
+                                     }
+        return pending_tasks
 
 
 def setup_log():
