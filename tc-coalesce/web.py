@@ -59,16 +59,6 @@ def list(key):
     coalesced_list = rds.lrange(pf_key, start=0, end=-1)
     return jsonify(**{ key : coalesced_list})
 
-# DEBUG: remove before release
-@app.route('/v1/pending_status')
-def pending_status():
-    """
-    GET: return list of pending tasks
-    """
-    pending_tasks_list = rds.keys( pf + "pending_tasks.*")
-    return jsonify(**{ 'pending_tasks' : pending_tasks_list})
-
-
 
 if __name__ == '__main__':
     # TODO: remove debug arg
