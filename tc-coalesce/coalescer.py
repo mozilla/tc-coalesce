@@ -24,9 +24,13 @@ class CoalescingMachine(object):
         coalesce_key = self.pending_tasks['coalesce_key']
         self.rds.sadd(self.pf + "list_keys", coalesce_key)
         self.rds.lpush(self.pf + "lists." + coalesce_key, taskId)
+        self.stats.set('coalesced_lists',
+                       len(self.rds.llen(self.pf + "list_keys")))
 
     def remove_task(self, taskId):
         coalesce_key = self.pending_tasks['coalesce_key']
         self.rds.lrem(self.pf + 'lists.' + coalesce_key, taskId, num=0)
         if self.rds.llen(self.pf + 'lists.' + coalesce_key) == 0:
             self.rds.srem(self.pf + "list_keys", coalesce_key)
+            self.stats.set('coalesced_lists',
+                           len(self.rds.llen(self.pf + "list_keys")))
