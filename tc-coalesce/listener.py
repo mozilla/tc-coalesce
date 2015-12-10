@@ -106,8 +106,7 @@ class TaskEventApp(object):
     # from task-pending, task-running, and task-exception
     # { 'task_id':
     #            {'task_msg_body': body,
-    #             'task_route_key': primary_route_key,
-    #             'task_optional_routes': [optional_routes]
+    #             'coalesce_key': coalesce_key
     #            }
     pending_tasks = {}
 
@@ -143,8 +142,6 @@ class TaskEventApp(object):
         log.info("Gracefully shutting down")
         log.info("Deleting Pulse queue")
         self.listener.delete_queue()
-        log.info("Flushing Redis keys")
-        self.rds.flushdb()
         sys.exit(1)
 
     def delete_queue(self):
@@ -181,19 +178,26 @@ class TaskEventApp(object):
 
 
     def _add_task_callback(self, taskId, body, message):
-        primary_route = message.delivery_info['routing_key']
-        optional_routes = message.headers['CC']
+        # Extract and store first coalesce key that matches
+        for route in message.headers['CC']:
+            route = route[6:]
+            if self.pf == route[:len(self.pf)]:
+                coalesce_key = route[len(self.pf):]
+                break
+
         if taskId in self.pending_tasks:
             self.stats.notch('tasks_reran')
 
         # Insert task in to a master list for pending tasks
         self.pending_tasks[taskId] = {'task_msg_body': body,
-                                        'task_route_key': primary_route,
-                                        'task_optional_routes': optional_routes
-                                        }
+                                      'coalesce_key': coalesce_key
+                                      }
         # Keep a running state of pending tasks in redis
-        # TODO: store as hashs
         self.rds.sadd(self.pf + 'pending_tasks', taskId)
+        self.rds.hmset(self.pf + 'pending_tasks.' + taskId,
+                       'task_msg_body', body,
+                       'coalesce_key', coalesce_key)
+
         self.stats.set('pending_count', len(self.pending_tasks))
         self.coalescer.insert_task(taskId)
 
@@ -205,8 +209,8 @@ class TaskEventApp(object):
             return
 
         del self.pending_tasks[taskId]
-        # TODO: store as hashs
         self.rds.srem(self.pf + 'pending_tasks', taskId)
+        self.rds.delete(self.pf + 'pending_tasks.' + taskId)
         self.stats.set('pending_count', len(self.pending_tasks))
 
 

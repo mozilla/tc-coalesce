@@ -21,20 +21,12 @@ class CoalescingMachine(object):
         self.stats = stats
 
     def insert_task(self, taskId):
-        for coalesce_key in self._get_coalesce_key(taskId):
-            self.rds.sadd(self.pf + "list_keys", coalesce_key)
-            self.rds.lpush(self.pf + "lists." + coalesce_key, taskId)
+        coalesce_key = self.pending_tasks['coalesce_key']
+        self.rds.sadd(self.pf + "list_keys", coalesce_key)
+        self.rds.lpush(self.pf + "lists." + coalesce_key, taskId)
 
     def remove_task(self, taskId):
-        for coalesce_key in self._get_coalesce_key(taskId):
-            self.rds.lrem(self.pf + 'lists.' + coalesce_key, taskId, num=0)
-            if self.rds.llen(self.pf + 'lists.' + coalesce_key) == 0:
-                self.rds.srem(self.pf + "list_keys", coalesce_key)
-
-    def _get_coalesce_key(self, taskId):
-        for route in self.pending_tasks[taskId]['task_optional_routes']:
-            # strip 'route.'
-            route = route[6:]
-            if self.pf == route[:len(self.pf)]:
-                coalesce_key = route[len(self.pf):]
-                yield coalesce_key
+        coalesce_key = self.pending_tasks['coalesce_key']
+        self.rds.lrem(self.pf + 'lists.' + coalesce_key, taskId, num=0)
+        if self.rds.llen(self.pf + 'lists.' + coalesce_key) == 0:
+            self.rds.srem(self.pf + "list_keys", coalesce_key)
