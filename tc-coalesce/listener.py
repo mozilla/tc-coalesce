@@ -194,7 +194,6 @@ class TaskEventApp(object):
                                       'coalesce_key': coalesce_key
                                       }
         # Keep a running state of pending tasks in redis
-        self.rds.sadd(self.pf + 'pending_tasks', taskId)
         self.rds.hmset(self.pf + 'pending_tasks.' + taskId,
                        'task_msg_body', body,
                        'coalesce_key', coalesce_key)
@@ -210,7 +209,6 @@ class TaskEventApp(object):
             return
 
         del self.pending_tasks[taskId]
-        self.rds.srem(self.pf + 'pending_tasks', taskId)
         self.rds.delete(self.pf + 'pending_tasks.' + taskId)
         self.stats.set('pending_count', len(self.pending_tasks))
 

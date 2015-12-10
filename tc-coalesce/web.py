@@ -65,8 +65,7 @@ def pending_status():
     """
     GET: return list of pending tasks
     """
-    pending_tasks_set = rds.smembers( pf + "pending_tasks")
-    pending_tasks_list = [x for x in pending_tasks_set]
+    pending_tasks_list = rds.keys( pf + "pending_tasks.*")
     return jsonify(**{ 'pending_tasks' : pending_tasks_list})
 
 
