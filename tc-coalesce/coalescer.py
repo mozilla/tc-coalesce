@@ -12,23 +12,18 @@ class CoalescingMachine(object):
 
     pf = "default."
 
-    pending_tasks = None
-
-    def __init__(self, pending_tasks, redis_prefix, datastore, stats):
-        self.pending_tasks = pending_tasks
+    def __init__(self, redis_prefix, datastore, stats):
         self.pf = redis_prefix
         self.rds = datastore
         self.stats = stats
 
-    def insert_task(self, taskId):
-        coalesce_key = self.pending_tasks[taskId]['coalesce_key']
+    def insert_task(self, taskId, coalesce_key):
         self.rds.sadd(self.pf + "list_keys", coalesce_key)
         self.rds.lpush(self.pf + "lists." + coalesce_key, taskId)
         self.stats.set('coalesced_lists',
                        len(self.rds.llen(self.pf + "list_keys")))
 
-    def remove_task(self, taskId):
-        coalesce_key = self.pending_tasks[taskId]['coalesce_key']
+    def remove_task(self, taskId, coalesce_key):
         self.rds.lrem(self.pf + 'lists.' + coalesce_key, taskId, num=0)
         if self.rds.llen(self.pf + 'lists.' + coalesce_key) == 0:
             self.rds.srem(self.pf + "list_keys", coalesce_key)

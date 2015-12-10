@@ -116,8 +116,7 @@ class TaskEventApp(object):
         self.stats = stats
         self.rds = datastore
         self.pending_tasks = self._reload_pending_tasks(datastore)
-        self.coalescer = CoalescingMachine(self.pending_tasks,
-                                           redis_prefix,
+        self.coalescer = CoalescingMachine(redis_prefix,
                                            datastore,
                                            stats=stats)
         route_key = "route." + redis_prefix + "#"
@@ -166,10 +165,16 @@ class TaskEventApp(object):
         """
         taskState = body['status']['state']
         taskId = body['status']['taskId']
+        # Extract and store first coalesce key that matches
+        for route in message.headers['CC']:
+            route = route[6:]
+            if self.pf == route[:len(self.pf)]:
+                coalesce_key = route[len(self.pf):]
+                break
         if taskState == 'pending':
-            self._add_task_callback(taskId, body, message)
+            self._add_task_callback(taskId, body, message, coalesce_key)
         elif taskState == 'running' or taskState == 'exception':
-            self._remove_task_callback(taskId)
+            self._remove_task_callback(taskId, coalesce_key)
         else:
             raise StateError
         message.ack()
@@ -178,16 +183,8 @@ class TaskEventApp(object):
         log.debug("taskId: %s (%s) - PendingTasks: %s" % (taskId, taskState, self.stats.get('pending_count')))
 
 
-    def _add_task_callback(self, taskId, body, message):
-        # Extract and store first coalesce key that matches
-        for route in message.headers['CC']:
-            route = route[6:]
-            if self.pf == route[:len(self.pf)]:
-                coalesce_key = route[len(self.pf):]
-                break
+    def _add_task_callback(self, taskId, body, message, coalesce_key):
 
-        if taskId in self.pending_tasks:
-            self.stats.notch('tasks_reran')
 
         # Insert task in to a master list for pending tasks
         self.pending_tasks[taskId] = {'task_msg_body': body,
@@ -199,11 +196,11 @@ class TaskEventApp(object):
                        'coalesce_key', coalesce_key)
 
         self.stats.set('pending_count', len(self.pending_tasks))
-        self.coalescer.insert_task(taskId)
+        self.coalescer.insert_task(taskId, coalesce_key)
 
-    def _remove_task_callback(self, taskId):
+    def _remove_task_callback(self, taskId, coalesce_key):
         if taskId in self.pending_tasks:
-            self.coalescer.remove_task(taskId)
+            self.coalescer.remove_task(taskId, coalesce_key)
         else:
             self.stats.notch('unknown_tasks')
             return

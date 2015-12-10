@@ -8,7 +8,6 @@ class Stats(object):
     stats = {'pending_count': 0,   # number of pending tasks
              'coalesced_lists': 0, # number of coalesced lists
              'unknown_tasks': 0,   # number of tasks seen missing from pending
-             'tasks_reran': 0,     # number of tasks sent back to pending
              'premature': 0,       # number of premature msgs
              'total_msgs_handled': 0
     }
