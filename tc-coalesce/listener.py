@@ -170,9 +170,9 @@ class TaskEventApp(object):
                 coalesce_key = route[len(self.pf):]
                 break
         if taskState == 'pending':
-            self._add_task_callback(taskId, coalesce_key)
-        elif taskState == 'running' or taskState == 'exception':
             self.coalescer.insert_task(taskId, coalesce_key)
+        elif taskState == 'running' or taskState == 'exception':
+            self.coalescer.remove_task(taskId, coalesce_key)
         else:
             raise StateError
         message.ack()
