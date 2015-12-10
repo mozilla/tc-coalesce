@@ -101,14 +101,6 @@ class TaskEventApp(object):
     # Coalesing machine
     coalescer = None
 
-    # pending_tasks is a dict where all pending tasks are kept along with the
-    # received amqp msg and taskdef. Tasks are added or removed based on msgs
-    # from task-pending, task-running, and task-exception
-    # { 'task_id':
-    #            {'task_msg_body': body,
-    #             'coalesce_key': coalesce_key
-    #            }
-
     def __init__(self, redis_prefix, options, stats, datastore):
         self.pf = redis_prefix
         self.options = options
