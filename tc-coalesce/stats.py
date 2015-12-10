@@ -16,8 +16,12 @@ class Stats(object):
     def __init__(self, redis_prefix, datastore):
         self.pf = redis_prefix + "stats"
         self.rds = datastore
+        h_keys = self.rds.hkeys(self.pf)
         for key in self.stats.keys():
-            self.rds.hset(self.pf, key, self.stats[key])
+            if key in h_keys:
+                self.stats[key] = self.rds.hget(self.pf, key)
+            else:
+                self.rds.hset(self.pf, key, self.stats[key])
 
     def notch(self, counter):
         self.stats[counter] += 1
