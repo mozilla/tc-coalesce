@@ -153,6 +153,11 @@ class TaskEventApp(object):
         """
         Route call body and msg to proper callback handler
         """
+        # Ignore tasks with non-zero runId (for now)
+        if not body['runId'] == 0:
+            message.ack()
+            return
+
         taskState = body['status']['state']
         taskId = body['status']['taskId']
         # Extract first coalesce key that matches
