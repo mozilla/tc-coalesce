@@ -11,6 +11,7 @@ from datetime import timedelta
 
 queue = taskcluster.Queue()
 
+
 def main(rds):
     pf = "coalesce.v1."
 
@@ -34,6 +35,7 @@ def main(rds):
 
     return tasks_removed, lists_removed
 
+
 def is_pending(taskId):
     try:
         status = queue.status(taskId)
@@ -46,6 +48,7 @@ def is_pending(taskId):
         if err.status_code == 404:
             return False
     return True
+
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',
@@ -67,7 +70,9 @@ if __name__ == '__main__':
 
         tasks_removed, lists_removed = main(rds)
         elapsed = time.time() - start
-        logging.info("Completed scrub task in %s" % (str(timedelta(seconds=elapsed))))
-        logging.info("Removed %s lists and %s tasks" % (tasks_removed, lists_removed))
+        logging.info("Completed scrub task in %s" %
+                     (str(timedelta(seconds=elapsed))))
+        logging.info("Removed %s lists and %s tasks" %
+                     (tasks_removed, lists_removed))
     except Exception:
         logging.exception("Fatal error in main loop")

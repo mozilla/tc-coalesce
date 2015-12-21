@@ -1,6 +1,3 @@
-import json
-import stat
-
 class CoalescingMachine(object):
     """
     Generic Coalescer object contains logic to build lists of tasks based on

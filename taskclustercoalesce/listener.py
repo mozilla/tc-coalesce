@@ -1,8 +1,6 @@
 import traceback
 import sys
 import os
-import json
-import socket
 import logging
 import redis
 import signal
@@ -21,6 +19,7 @@ class StateError(Exception):
 
 log = None
 
+
 class Options(object):
 
     options = {}
@@ -36,6 +35,7 @@ class Options(object):
         except KeyError:
             traceback.print_exc()
             sys.exit(1)
+
 
 class TcPulseConsumer(GenericConsumer):
     def __init__(self, exchanges, **kwargs):
@@ -84,8 +84,8 @@ class TaskEventApp(object):
         self.consumer_args['password'] = self.options['passwd']
         log.info("Binding to queue with route key: %s" % (route_key))
         self.listener = TcPulseConsumer(self.exchanges,
-                                callback=self._route_callback_handler,
-                                **self.consumer_args)
+                                        callback=self._route_callback_handler,
+                                        **self.consumer_args)
 
     def run(self):
         while True:
@@ -102,7 +102,6 @@ class TaskEventApp(object):
         log.info("Deleting Pulse queue")
         self.listener.delete_queue()
         sys.exit(1)
-
 
     def _route_callback_handler(self, body, message):
         """
@@ -130,6 +129,7 @@ class TaskEventApp(object):
         message.ack()
         self.stats.notch('total_msgs_handled')
         log.debug("taskId: %s (%s)" % (taskId, taskState))
+
 
 def setup_log():
     global log
@@ -161,9 +161,11 @@ def main():
     app.run()
     # graceful shutdown via SIGTERM
 
+
 def signal_term_handler(signal, frame):
     log.info("Handling signal: term")
     raise KeyboardInterrupt
+
 
 if __name__ == '__main__':
     main()
