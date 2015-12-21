@@ -27,25 +27,15 @@ class Options(object):
 
     def __init__(self):
         self._parse_env()
-        self._parse_args()
 
     def _parse_env(self):
         try:
             self.options['user'] = os.environ['PULSE_USER']
             self.options['passwd'] = os.environ['PULSE_PASSWD']
-        except KeyError:
-            traceback.print_exc()
-            sys.exit(1)
-        try:
             self.options['redis'] = urlparse(os.environ['REDIS_URL'])
         except KeyError:
             traceback.print_exc()
             sys.exit(1)
-
-    def _parse_args(self):
-        # TODO: parse args and return them as options
-        pass
-
 
 class TcPulseConsumer(GenericConsumer):
     def __init__(self, exchanges, **kwargs):
@@ -193,8 +183,6 @@ def main():
     setup_log()
     options = Options().options
     log.info("Starting Coalescing Service")
-    # TODO: parse args
-    # TODO: pass args and options
 
     # prefix for all redis keys and route key
     redis_prefix = "coalesce.v1."
