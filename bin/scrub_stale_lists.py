@@ -4,11 +4,12 @@ import sys
 import os
 import time
 import redis
-import requests
+import taskcluster
 import logging
 from urlparse import urlparse
 from datetime import timedelta
 
+queue = taskcluster.Queue()
 
 def main(rds):
     pf = "coalesce.v1."
@@ -34,16 +35,16 @@ def main(rds):
     return tasks_removed, lists_removed
 
 def is_pending(taskId):
-    url = 'https://queue.taskcluster.net/v1/task/%s/status' % (taskId)
     try:
-        r = requests.get(url, timeout=3)
-        if r.status_code == 404:
-            logging.debug("Queue service returned 404 for task: " + taskId)
+        status = queue.status(taskId)
+        if not status['status']['state'] == 'pending':
             return False
-        if not r.json()['status']['state'] == 'pending':
+    except taskcluster.exceptions.TaskclusterRestFailure, err:
+        logging.debug("Taskcluster rest api error (%s): %s %s" % (taskId,
+                                                                  err.status,
+                                                                  err.message))
+        if err.status_code == 404:
             return False
-    except:
-        logging.debug("Failed to get status")
     return True
 
 if __name__ == '__main__':
