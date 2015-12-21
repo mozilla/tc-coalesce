@@ -42,27 +42,6 @@ class TcPulseConsumer(GenericConsumer):
         super(TcPulseConsumer, self).__init__(
             PulseConfiguration(**kwargs), exchanges, **kwargs)
 
-    def listen(self, callback=None, on_connect_callback=None):
-        while True:
-            consumer = self._build_consumer(
-                callback=callback,
-                on_connect_callback=on_connect_callback
-            )
-            with consumer:
-                self._drain_events_loop()
-
-    def _drain_events_loop(self):
-        while True:
-            try:
-                self.connection.drain_events(timeout=self.timeout)
-            except socket.timeout:
-                logging.warning("Timeout! Restarting pulse consumer.")
-                try:
-                    self.disconnect()
-                except Exception:
-                    logging.warning("Problem with disconnect().")
-                break
-
 
 class TaskEventApp(object):
 
@@ -123,20 +102,6 @@ class TaskEventApp(object):
         log.info("Deleting Pulse queue")
         self.listener.delete_queue()
         sys.exit(1)
-
-    def delete_queue(self):
-        self._check_params()
-        if not self.connection:
-            self.connect()
-
-        queue = self._create_queue()
-        try:
-            queue(self.connection).delete()
-        except ChannelError as e:
-            if e.message != 404:
-                raise
-        except:
-            raise
 
 
     def _route_callback_handler(self, body, message):
