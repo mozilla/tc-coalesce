@@ -1,8 +1,6 @@
 import traceback
 import sys
 import os
-import json
-import socket
 import logging
 import redis
 import signal
@@ -21,57 +19,28 @@ class StateError(Exception):
 
 log = None
 
+
 class Options(object):
 
     options = {}
 
     def __init__(self):
         self._parse_env()
-        self._parse_args()
 
     def _parse_env(self):
         try:
             self.options['user'] = os.environ['PULSE_USER']
             self.options['passwd'] = os.environ['PULSE_PASSWD']
-        except KeyError:
-            traceback.print_exc()
-            sys.exit(1)
-        try:
             self.options['redis'] = urlparse(os.environ['REDIS_URL'])
         except KeyError:
             traceback.print_exc()
             sys.exit(1)
-
-    def _parse_args(self):
-        # TODO: parse args and return them as options
-        pass
 
 
 class TcPulseConsumer(GenericConsumer):
     def __init__(self, exchanges, **kwargs):
         super(TcPulseConsumer, self).__init__(
             PulseConfiguration(**kwargs), exchanges, **kwargs)
-
-    def listen(self, callback=None, on_connect_callback=None):
-        while True:
-            consumer = self._build_consumer(
-                callback=callback,
-                on_connect_callback=on_connect_callback
-            )
-            with consumer:
-                self._drain_events_loop()
-
-    def _drain_events_loop(self):
-        while True:
-            try:
-                self.connection.drain_events(timeout=self.timeout)
-            except socket.timeout:
-                logging.warning("Timeout! Restarting pulse consumer.")
-                try:
-                    self.disconnect()
-                except Exception:
-                    logging.warning("Problem with disconnect().")
-                break
 
 
 class TaskEventApp(object):
@@ -115,8 +84,8 @@ class TaskEventApp(object):
         self.consumer_args['password'] = self.options['passwd']
         log.info("Binding to queue with route key: %s" % (route_key))
         self.listener = TcPulseConsumer(self.exchanges,
-                                callback=self._route_callback_handler,
-                                **self.consumer_args)
+                                        callback=self._route_callback_handler,
+                                        **self.consumer_args)
 
     def run(self):
         while True:
@@ -133,21 +102,6 @@ class TaskEventApp(object):
         log.info("Deleting Pulse queue")
         self.listener.delete_queue()
         sys.exit(1)
-
-    def delete_queue(self):
-        self._check_params()
-        if not self.connection:
-            self.connect()
-
-        queue = self._create_queue()
-        try:
-            queue(self.connection).delete()
-        except ChannelError as e:
-            if e.message != 404:
-                raise
-        except:
-            raise
-
 
     def _route_callback_handler(self, body, message):
         """
@@ -176,13 +130,13 @@ class TaskEventApp(object):
         self.stats.notch('total_msgs_handled')
         log.debug("taskId: %s (%s)" % (taskId, taskState))
 
+
 def setup_log():
-    # TODO: pass options and check for log level aka debug or not
     global log
     log = logging.getLogger(__name__)
-    log.setLevel(logging.DEBUG)
+    lvl = logging.DEBUG if os.getenv('DEBUG', False) else logging.INFO
+    log.setLevel(lvl)
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter('[%(asctime)s] [%(process)d] ' \
                                   '[%(levelname)s] %(message)s',
                                   datefmt='%Y-%m-%d %H:%M:%S +0000')
@@ -195,8 +149,6 @@ def main():
     setup_log()
     options = Options().options
     log.info("Starting Coalescing Service")
-    # TODO: parse args
-    # TODO: pass args and options
 
     # prefix for all redis keys and route key
     redis_prefix = "coalesce.v1."
@@ -211,9 +163,11 @@ def main():
     app.run()
     # graceful shutdown via SIGTERM
 
+
 def signal_term_handler(signal, frame):
     log.info("Handling signal: term")
     raise KeyboardInterrupt
+
 
 if __name__ == '__main__':
     main()

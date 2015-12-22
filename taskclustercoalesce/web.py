@@ -2,8 +2,7 @@ import traceback
 import sys
 import os
 import flask
-from flask import Flask, jsonify, Response
-import json
+from flask import jsonify
 import redis
 from urlparse import urlparse
 
@@ -22,6 +21,7 @@ rds = redis.Redis(host=redis_url.hostname,
                   password=redis_url.password,
                   decode_responses=True)
 
+
 @app.route('/')
 def root():
     """
@@ -30,6 +30,7 @@ def root():
     # TODO: return an index on available api
     return jsonify({'versions': ['v1']})
 
+
 @app.route('/v1/list')
 def coalasce_lists():
     """
@@ -37,9 +38,10 @@ def coalasce_lists():
     """
     list_keys_set = rds.smembers(pf + "list_keys")
     if len(list_keys_set) == 0:
-        return jsonify(**{ pf : []})
+        return jsonify(**{pf: []})
     list_keys = [x for x in list_keys_set]
-    return jsonify(**{ pf : list_keys})
+    return jsonify(**{pf: list_keys})
+
 
 @app.route('/v1/stats')
 def stats():
@@ -50,6 +52,7 @@ def stats():
     stats = rds.hgetall(pf_key)
     return flask.jsonify(**stats)
 
+
 @app.route('/v1/list/<key>')
 def list(key):
     """
@@ -57,7 +60,7 @@ def list(key):
     """
     pf_key = pf + 'lists.' + key
     coalesced_list = rds.lrange(pf_key, start=0, end=-1)
-    return jsonify(**{ key : coalesced_list})
+    return jsonify(**{key: coalesced_list})
 
 
 if __name__ == '__main__':
