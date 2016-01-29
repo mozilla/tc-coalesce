@@ -49,17 +49,18 @@ class TaskEventApp(object):
     listener = None
 
     # State transitions
-    # pending --> running
+    # pending --> running --> (completed|exception|failed)
     #         \-> exception
     exchanges = ['exchange/taskcluster-queue/v1/task-pending',
-                 'exchange/taskcluster-queue/v1/task-running',
-                 'exchange/taskcluster-queue/v1/task-exception']
+                 'exchange/taskcluster-queue/v1/task-completed',
+                 'exchange/taskcluster-queue/v1/task-exception',
+                 'exchange/taskcluster-queue/v1/task-failed']
 
     # TODO: move these to args and env options
     # TODO: make perm coalescer service pulse creds
     consumer_args = {
         'applabel': 'releng-tc-coalesce',
-        'topic': ['#', '#', '#'],
+        'topic': ['#', '#', '#', '#'],
         'durable': True,
         'user': 'public',
         'password': 'public'
@@ -122,7 +123,9 @@ class TaskEventApp(object):
                 break
         if taskState == 'pending':
             self.coalescer.insert_task(taskId, coalesce_key)
-        elif taskState == 'running' or taskState == 'exception':
+        elif taskState == 'completed' or \
+                taskState == 'exception' or \
+                taskState == 'failed':
             self.coalescer.remove_task(taskId, coalesce_key)
         else:
             raise StateError
