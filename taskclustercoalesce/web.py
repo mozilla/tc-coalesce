@@ -56,11 +56,11 @@ def stats():
 @app.route('/v1/list/<key>')
 def list(key):
     """
-    GET: returns list
+    GET: returns a list of ordered taskIds associated with the key provided
     """
     pf_key = pf + 'lists.' + key
     coalesced_list = rds.lrange(pf_key, start=0, end=-1)
-    return jsonify(**{key: coalesced_list})
+    return jsonify(**{'supersedes': coalesced_list})
 
 
 if __name__ == '__main__':
