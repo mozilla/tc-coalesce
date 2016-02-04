@@ -2,9 +2,12 @@ import traceback
 import sys
 import os
 import flask
+import time
 from flask import jsonify
 import redis
 from urlparse import urlparse
+
+starttime = time.time()
 
 app = flask.Flask(__name__)
 
@@ -29,6 +32,13 @@ def root():
     """
     # TODO: return an index on available api
     return jsonify({'versions': ['v1']})
+
+
+@app.route('/v1/ping')
+def ping():
+    """ GET: return web process uptime """
+    ping = {'alive': True, 'uptime': time.time() - starttime}
+    return jsonify(**ping)
 
 
 @app.route('/v1/list')
