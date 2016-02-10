@@ -137,9 +137,9 @@ class TaskEventApp(object):
 def setup_log():
     global log
     log = logging.getLogger(__name__)
-    lvl = logging.DEBUG if os.getenv('DEBUG', False) else logging.INFO
+    lvl = logging.DEBUG if os.getenv('DEBUG') == 'True' else logging.INFO
     log.setLevel(lvl)
-    console_handler = logging.StreamHandler()
+    console_handler = logging.StreamHandler(sys.stdout)
     formatter = logging.Formatter('[%(asctime)s] [%(process)d] ' \
                                   '[%(levelname)s] %(message)s',
                                   datefmt='%Y-%m-%d %H:%M:%S +0000')

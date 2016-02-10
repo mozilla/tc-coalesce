@@ -4,6 +4,7 @@ import os
 import flask
 import time
 import redis
+import logging
 from flask import jsonify
 from urlparse import urlparse
 from werkzeug.contrib.fixers import ProxyFix
@@ -12,6 +13,10 @@ from flask_sslify import SSLify
 starttime = time.time()
 
 app = flask.Flask(__name__)
+handler = logging.StreamHandler(sys.stdout)
+app.logger.addHandler(handler)
+lvl = logging.DEBUG if os.getenv('DEBUG') == 'True' else logging.INFO
+app.logger.setLevel(lvl)
 
 if 'DYNO' in os.environ:
     app.wsgi_app = ProxyFix(app.wsgi_app)
