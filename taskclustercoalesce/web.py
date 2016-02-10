@@ -3,13 +3,19 @@ import sys
 import os
 import flask
 import time
-from flask import jsonify
 import redis
+from flask import jsonify
 from urlparse import urlparse
+from werkzeug.contrib.fixers import ProxyFix
+from flask_sslify import SSLify
 
 starttime = time.time()
 
 app = flask.Flask(__name__)
+
+if 'DYNO' in os.environ:
+    app.wsgi_app = ProxyFix(app.wsgi_app)
+    SSLify(app, age=300, permanent=True)
 
 pf = "coalesce.v1."
 
