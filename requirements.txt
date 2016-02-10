@@ -1,6 +1,7 @@
 amqp==1.4.7
 anyjson==0.3.3
 Flask==0.10.1
+Flask-SSLify==0.1.5
 gunicorn==19.4.1
 itsdangerous==0.24
 Jinja2==2.8

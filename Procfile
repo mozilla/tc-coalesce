@@ -1,2 +1,2 @@
 worker: python -u taskclustercoalesce/listener.py
-web: gunicorn taskclustercoalesce.web:app --log-file -
+web: gunicorn --config=config/gunicorn.py taskclustercoalesce.web:app --log-file -
