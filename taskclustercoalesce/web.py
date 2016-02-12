@@ -5,7 +5,7 @@ import flask
 import time
 import redis
 import logging
-from flask import jsonify
+from flask import jsonify, request
 from urlparse import urlparse
 from werkzeug.contrib.fixers import ProxyFix
 from flask_sslify import SSLify
@@ -82,6 +82,61 @@ def list(key):
     pf_key = pf + 'lists.' + key
     coalesced_list = rds.lrange(pf_key, start=0, end=-1)
     return jsonify(**{'supersedes': coalesced_list})
+
+
+@app.route('/v1/threshold/<key>', methods=['GET', 'POST', 'DELETE'])
+def threshold(key):
+    """
+    GET: Returns an object containing the age and size threshold setting for
+    the key provided. Returns 200 on success
+    POST: Sets the age and size threshold setting for the key provided.
+    Returns 200 on success. Returns 400 if arguments are missing or non-integer
+    DELETE: Deletes the threshold settings of the key provided. Returns 200
+    on success.
+    """
+    pf_key = pf + 'threshold.' + key
+    if request.method == 'POST':
+        age = request.args.get('age', default=None, type=int)
+        size = request.args.get('size', default=None, type=int)
+        if age and size:
+            rds.sadd(pf + 'threshold_set', key)
+            rds.set(pf_key + '.age', age)
+            rds.set(pf_key + '.size', size)
+            return action_response('set_threshold')
+        else:
+            return action_response('set_threshold', False, 400)
+    elif request.method == 'GET':
+        age = rds.get(pf_key + '.age')
+        size = rds.get(pf_key + '.size')
+        return jsonify(**{key: {'age': age, 'size': size}})
+    else:
+        rds.delete(pf_key + '.age')
+        rds.delete(pf_key + '.size')
+        rds.srem(pf + 'threshold_set', key)
+        return action_response('delete_threshold')
+
+
+@app.route('/v1/threshold')
+def list_thresholds():
+    """
+    GET: Returns an object containing all keys and their associated thresholds.
+    Returns 200 on success
+    """
+    pf_key = pf + 'threshold.'
+    d = {}
+    threshold_set = rds.smembers(pf + 'threshold_set')
+    for key in threshold_set:
+        age = rds.get(pf_key + key + '.age')
+        size = rds.get(pf_key + key + '.size')
+        d[key] = {'age': age, 'size': size}
+    return jsonify(**d)
+
+
+def action_response(action, success=True, status_code=200):
+    """ Returns a stock json response """
+    resp = jsonify(**{'action': action, 'success': success})
+    resp.status_code = status_code
+    return resp
 
 
 if __name__ == '__main__':
