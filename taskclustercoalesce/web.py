@@ -80,8 +80,17 @@ def list(key):
     GET: returns a list of ordered taskIds associated with the key provided
     """
     pf_key = pf + 'lists.' + key
+    pf_th = pf + 'threshold.' + key
+    empty_resp = jsonify(**{'supersedes': []})
     coalesced_list = rds.lrange(pf_key, start=0, end=-1)
-    return jsonify(**{'supersedes': coalesced_list})
+    if len(coalesced_list) == 0:
+        return empty_resp
+    age = rds.get(pf_th + '.age')
+    size = rds.get(pf_th + '.size')
+    oldest_task_age = rds.get(pf + coalesced_list[-1] + '.timestamp')
+    if len(coalasce_lists) > size and oldest_task_age > age:
+        return jsonify(**{'supersedes': coalesced_list})
+    return empty_resp
 
 
 @app.route('/v1/threshold/<key>', methods=['GET', 'POST', 'DELETE'])
