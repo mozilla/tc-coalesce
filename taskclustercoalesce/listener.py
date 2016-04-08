@@ -98,10 +98,6 @@ class TaskEventApp(object):
             except:
                 traceback.print_exc()
 
-    def a_test(self):
-        a = "test"
-        return a
-
     def _graceful_shutdown(self):
         log.info("Gracefully shutting down")
         log.info("Deleting Pulse queue")
