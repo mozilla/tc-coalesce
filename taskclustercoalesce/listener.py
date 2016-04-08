@@ -98,6 +98,10 @@ class TaskEventApp(object):
             except:
                 traceback.print_exc()
 
+    def a_test(self):
+        a = "test"
+        return a
+
     def _graceful_shutdown(self):
         log.info("Gracefully shutting down")
         log.info("Deleting Pulse queue")
@@ -140,8 +144,8 @@ def setup_log():
     lvl = logging.DEBUG if os.getenv('DEBUG') == 'True' else logging.INFO
     log.setLevel(lvl)
     console_handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter('[%(asctime)s] [%(process)d] ' \
-                                  '[%(levelname)s] %(message)s',
+    formatter = logging.Formatter('[%(asctime)s] [%(process)d] \
+                                   [%(levelname)s] %(message)s',
                                   datefmt='%Y-%m-%d %H:%M:%S +0000')
     console_handler.setFormatter(formatter)
     log.addHandler(console_handler)

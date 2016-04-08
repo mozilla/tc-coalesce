@@ -92,7 +92,7 @@ def list(key):
     GET: returns a list of ordered taskIds associated with the key provided
     """
     pf_key = g.pf + 'lists.' + key
-    coalesced_list = g.rds.lrange(pf_key, start=0, end=-1)
+    coalesced_list = g.rds.lrange(pf_key, 0, -1)
     return jsonify(**{'supersedes': coalesced_list})
 
 
