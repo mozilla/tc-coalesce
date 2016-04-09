@@ -1,5 +1,6 @@
 import time
 
+
 class CoalescingMachine(object):
     """
     Generic Coalescer object contains logic to build lists of tasks based on
@@ -19,13 +20,13 @@ class CoalescingMachine(object):
     def insert_task(self, taskId, coalesce_key):
         self.rds.sadd(self.pf + "list_keys", coalesce_key)
         self.rds.lpush(self.pf + "lists." + coalesce_key, taskId)
-        self.rds.set(self.pf + taskId +'.timestamp', time.time())
+        self.rds.set(self.pf + taskId + '.timestamp', time.time())
         self.stats.set('coalesced_lists',
                        self.rds.scard(self.pf + "list_keys"))
 
     def remove_task(self, taskId, coalesce_key):
         self.rds.lrem(self.pf + 'lists.' + coalesce_key, taskId, num=0)
-        self.rds.delete(self.pf + taskId +'.timestamp')
+        self.rds.delete(self.pf + taskId + '.timestamp')
         if self.rds.llen(self.pf + 'lists.' + coalesce_key) == 0:
             self.rds.srem(self.pf + "list_keys", coalesce_key)
             self.stats.set('coalesced_lists',

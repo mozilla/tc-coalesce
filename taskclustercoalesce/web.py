@@ -83,14 +83,34 @@ def list(key):
     pf_th = pf + 'threshold.' + key
     empty_resp = jsonify(**{'supersedes': []})
     coalesced_list = rds.lrange(pf_key, start=0, end=-1)
+
+    # Return empty resp if list is empty
     if len(coalesced_list) == 0:
         return empty_resp
-    age = rds.get(pf_th + '.age')
-    size = rds.get(pf_th + '.size')
+
+    # Get threshold settings for key
+    threshold_age = rds.get(pf_th + '.age')
+    threshold_size = rds.get(pf_th + '.size')
+
+    # Return empty resp if either age or size threshold are not defined
+    if not threshold_age or not threshold_size:
+        return empty_resp
+
+    # Return empty resp if taskid list is
+    # less than or equal to the size threshold
+    if len(coalasce_lists) <= threshold_size:
+        return empty_resp
+
+    # Get age of oldest taskid in the list
     oldest_task_age = rds.get(pf + coalesced_list[-1] + '.timestamp')
-    if len(coalasce_lists) > size and oldest_task_age > age:
-        return jsonify(**{'supersedes': coalesced_list})
-    return empty_resp
+
+    # Return empty resp if age of the oldest taskid in list is
+    # less than or equal to the age threshold
+    if (time.time() - oldest_task_age) <= threshold_age:
+        return empty_resp
+
+    # Thresholds have been exceeded. Return list for coalescing
+    return jsonify(**{'supersedes': coalesced_list})
 
 
 @app.route('/v1/threshold/<key>', methods=['GET', 'POST', 'DELETE'])
@@ -105,9 +125,11 @@ def threshold(key):
     """
     pf_key = pf + 'threshold.' + key
     if request.method == 'POST':
+        # age and size will return None is non-exist or non-int
         age = request.args.get('age', default=None, type=int)
         size = request.args.get('size', default=None, type=int)
-        if age and size:
+        if (isinstance(age, int) and age >= 0) and \
+           (isinstance(size, int) and size >= 0):
             rds.sadd(pf + 'threshold_set', key)
             rds.set(pf_key + '.age', age)
             rds.set(pf_key + '.size', size)
