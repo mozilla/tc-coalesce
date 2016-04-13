@@ -94,6 +94,8 @@ def list(key):
 
     # Return empty resp if either age or size threshold are not defined
     if not threshold_age or not threshold_size:
+        app.logger.warning(
+            "Key '{0}' is missing one or more threshold settings".format(key))
         return empty_resp
 
     # Return empty resp if taskid list is
