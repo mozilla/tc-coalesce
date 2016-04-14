@@ -4,7 +4,7 @@ import flask
 import time
 import redis
 import logging
-from flask import jsonify, g
+from flask import jsonify
 from urlparse import urlparse
 from werkzeug.contrib.fixers import ProxyFix
 from flask_sslify import SSLify
@@ -31,21 +31,22 @@ lvl = logging.DEBUG if app.config['DEBUG'] == 'True' else logging.INFO
 app.logger.setLevel(lvl)
 
 
-def connect_rds():
+def connect_redis(app):
     redis_url = urlparse(app.config['REDIS_URL'])
-    rds = redis.Redis(host=redis_url.hostname,
-                      port=redis_url.port,
-                      password=redis_url.password,
-                      decode_responses=True)
-    return rds
+    app.redis = redis.Redis(host=redis_url.hostname,
+                            port=redis_url.port,
+                            password=redis_url.password,
+                            decode_responses=True)
+    return app
 
 
-@app.before_request
-def before_request():
-    if not hasattr(g, 'rds'):
-        g.rds = connect_rds()
-    if not hasattr(g, 'pf'):
-        g.pf = app.config['PREFIX']
+def set_prefix(app):
+    app.prefix = app.config['PREFIX']
+    return app
+
+# Setup application
+app = connect_redis(app)
+app = set_prefix(app)
 
 
 @app.route('/')
@@ -61,7 +62,7 @@ def root():
 def ping():
     """ GET: return web process uptime """
     ping = {'alive': True, 'uptime': time.time() - starttime}
-    return jsonify(**ping)
+    return jsonify(ping)
 
 
 @app.route('/v1/list')
@@ -69,11 +70,11 @@ def coalasce_lists():
     """
     GET: returns a list of all coalesced objects load into the listener
     """
-    list_keys_set = g.rds.smembers(g.pf + "list_keys")
+    list_keys_set = app.redis.smembers(app.prefix + "list_keys")
     if len(list_keys_set) == 0:
-        return jsonify(**{g.pf: []})
+        return jsonify({app.prefix: []})
     list_keys = [x for x in list_keys_set]
-    return jsonify(**{g.pf: list_keys})
+    return jsonify({app.prefix: list_keys})
 
 
 @app.route('/v1/stats')
@@ -81,9 +82,9 @@ def stats():
     """
     GET: returns stats
     """
-    pf_key = g.pf + 'stats'
-    stats = g.rds.hgetall(pf_key)
-    return flask.jsonify(**stats)
+    prefix_key = app.prefix + 'stats'
+    stats = app.redis.hgetall(prefix_key)
+    return flask.jsonify(stats)
 
 
 @app.route('/v1/list/<key>')
@@ -91,9 +92,9 @@ def list(key):
     """
     GET: returns a list of ordered taskIds associated with the key provided
     """
-    pf_key = g.pf + 'lists.' + key
-    coalesced_list = g.rds.lrange(pf_key, 0, -1)
-    return jsonify(**{'supersedes': coalesced_list})
+    prefix_key = app.prefix + 'lists.' + key
+    coalesced_list = app.redis.lrange(prefix_key, 0, -1)
+    return jsonify({'supersedes': coalesced_list})
 
 
 if __name__ == '__main__':

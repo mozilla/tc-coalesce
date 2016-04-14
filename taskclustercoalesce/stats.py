@@ -1,7 +1,7 @@
 
 class Stats(object):
 
-    pf = "default.stats"
+    prefix = "default.stats"
 
     # stats is a dict where running statistical data is stored to be available
     # via the api
@@ -12,26 +12,26 @@ class Stats(object):
              'total_msgs_handled': 0
              }
 
-    def __init__(self, redis_prefix, datastore):
-        self.pf = redis_prefix + "stats"
-        self.rds = datastore
-        h_keys = self.rds.hkeys(self.pf)
+    def __init__(self, prefix, datastore):
+        self.prefix = prefix + "stats"
+        self.redis = datastore
+        h_keys = self.redis.hkeys(self.prefix)
         for key in self.stats.keys():
             if key in h_keys:
-                self.stats[key] = int(self.rds.hget(self.pf, key))
+                self.stats[key] = int(self.redis.hget(self.prefix, key))
             else:
-                self.rds.hset(self.pf, key, self.stats[key])
+                self.redis.hset(self.prefix, key, self.stats[key])
 
     def notch(self, counter):
         self.stats[counter] += 1
-        self.rds.hset(self.pf, counter, self.stats[counter])
+        self.redis.hset(self.prefix, counter, self.stats[counter])
 
     def get(self, stat_name):
         return self.stats[stat_name]
 
     def set(self, stat_name, stat):
         self.stats[stat_name] = stat
-        self.rds.hset(self.pf, stat_name, stat)
+        self.redis.hset(self.prefix, stat_name, stat)
 
     def dump(self):
         return self.stats
