@@ -5,7 +5,7 @@ import flask
 import time
 import redis
 import logging
-from flask import jsonify, request
+from flask import jsonify
 from urlparse import urlparse
 from werkzeug.contrib.fixers import ProxyFix
 from flask_sslify import SSLify
@@ -21,6 +21,17 @@ app.logger.setLevel(lvl)
 if 'DYNO' in os.environ:
     app.wsgi_app = ProxyFix(app.wsgi_app)
     SSLify(app, age=300, permanent=True)
+
+
+def load_config(app):
+    # Valid environment types are Production, Testing, Development (Default)
+    environment_type = os.getenv('ENVIRONMENT_TYPE', 'Development')
+    app.logger.info('ENVIRONMENT_TYPE set to {0}'.format(environment_type))
+    app.config.from_object('config.config.{0}'.format(environment_type))
+    return app
+
+app = load_config(app)
+
 
 pf = "coalesce.v1."
 
@@ -80,7 +91,6 @@ def list(key):
     GET: returns a list of ordered taskIds associated with the key provided
     """
     pf_key = pf + 'lists.' + key
-    pf_th = pf + 'threshold.' + key
     empty_resp = jsonify(**{'supersedes': []})
     coalesced_list = rds.lrange(pf_key, start=0, end=-1)
 
@@ -88,9 +98,14 @@ def list(key):
     if len(coalesced_list) == 0:
         return empty_resp
 
-    # Get threshold settings for key
-    threshold_age = rds.get(pf_th + '.age')
-    threshold_size = rds.get(pf_th + '.size')
+    # Get threshold settings for key if key exists otherwise return empty resp
+    if app.config['THRESHOLDS'].get(key):
+        threshold_age = app.config['THRESHOLDS'][key].get('age')
+        threshold_size = app.config['THRESHOLDS'][key].get('size')
+    else:
+        app.logger.warning(
+            "Key '{0}' does not exist in threshold settings".format(key))
+        return empty_resp
 
     # Return empty resp if either age or size threshold are not defined
     if not threshold_age or not threshold_size:
@@ -115,38 +130,18 @@ def list(key):
     return jsonify(**{'supersedes': coalesced_list})
 
 
-@app.route('/v1/threshold/<key>', methods=['GET', 'POST', 'DELETE'])
+@app.route('/v1/threshold/<key>')
 def threshold(key):
     """
     GET: Returns an object containing the age and size threshold setting for
-    the key provided. Returns 200 on success
-    POST: Sets the age and size threshold setting for the key provided.
-    Returns 200 on success. Returns 400 if arguments are missing or non-integer
-    DELETE: Deletes the threshold settings of the key provided. Returns 200
-    on success.
+    the key provided. Returns 200 on success, 404 if key does not exist
     """
-    pf_key = pf + 'threshold.' + key
-    if request.method == 'POST':
-        # age and size will return None is non-exist or non-int
-        age = request.args.get('age', default=None, type=int)
-        size = request.args.get('size', default=None, type=int)
-        if (isinstance(age, int) and age >= 0) and \
-           (isinstance(size, int) and size >= 0):
-            rds.sadd(pf + 'threshold_set', key)
-            rds.set(pf_key + '.age', age)
-            rds.set(pf_key + '.size', size)
-            return action_response('set_threshold')
-        else:
-            return action_response('set_threshold', False, 400)
-    elif request.method == 'GET':
-        age = rds.get(pf_key + '.age')
-        size = rds.get(pf_key + '.size')
+    if app.config['THRESHOLDS'].get(key):
+        # Age and/or size return None is unset but key exists
+        age = app.config['THRESHOLDS'][key].get('age')
+        size = app.config['THRESHOLDS'][key].get('size')
         return jsonify(**{key: {'age': age, 'size': size}})
-    else:
-        rds.delete(pf_key + '.age')
-        rds.delete(pf_key + '.size')
-        rds.srem(pf + 'threshold_set', key)
-        return action_response('delete_threshold')
+    return action_response('get_theshold', False, 404)
 
 
 @app.route('/v1/threshold')
@@ -155,14 +150,7 @@ def list_thresholds():
     GET: Returns an object containing all keys and their associated thresholds.
     Returns 200 on success
     """
-    pf_key = pf + 'threshold.'
-    d = {}
-    threshold_set = rds.smembers(pf + 'threshold_set')
-    for key in threshold_set:
-        age = rds.get(pf_key + key + '.age')
-        size = rds.get(pf_key + key + '.size')
-        d[key] = {'age': age, 'size': size}
-    return jsonify(**d)
+    return jsonify(app.config['THRESHOLDS'])
 
 
 def action_response(action, success=True, status_code=200):
