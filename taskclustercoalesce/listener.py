@@ -71,15 +71,15 @@ class TaskEventApp(object):
     # Coalesing machine
     coalescer = None
 
-    def __init__(self, redis_prefix, options, stats, datastore):
-        self.pf = redis_prefix
+    def __init__(self, prefix, options, stats, datastore):
+        self.prefix = prefix
         self.options = options
         self.stats = stats
-        self.rds = datastore
-        self.coalescer = CoalescingMachine(redis_prefix,
+        self.redis = datastore
+        self.coalescer = CoalescingMachine(prefix,
                                            datastore,
                                            stats=stats)
-        route_key = "route." + redis_prefix + "#"
+        route_key = "route." + prefix + "#"
         self.consumer_args['topic'] = [route_key] * len(self.exchanges)
         self.consumer_args['user'] = self.options['user']
         self.consumer_args['password'] = self.options['passwd']
@@ -118,8 +118,8 @@ class TaskEventApp(object):
         # Extract first coalesce key that matches
         for route in message.headers['CC']:
             route = route[6:]
-            if self.pf == route[:len(self.pf)]:
-                coalesce_key = route[len(self.pf):]
+            if self.prefix == route[:len(self.prefix)]:
+                coalesce_key = route[len(self.prefix):]
                 break
         if taskState == 'pending':
             self.coalescer.insert_task(taskId, coalesce_key)
@@ -140,7 +140,7 @@ def setup_log():
     lvl = logging.DEBUG if os.getenv('DEBUG') == 'True' else logging.INFO
     log.setLevel(lvl)
     console_handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter('[%(asctime)s] [%(process)d] ' \
+    formatter = logging.Formatter('[%(asctime)s] [%(process)d] ' +
                                   '[%(levelname)s] %(message)s',
                                   datefmt='%Y-%m-%d %H:%M:%S +0000')
     console_handler.setFormatter(formatter)
@@ -154,14 +154,14 @@ def main():
     log.info("Starting Coalescing Service")
 
     # prefix for all redis keys and route key
-    redis_prefix = "coalesce.v1."
+    prefix = "coalesce.v1."
 
     # setup redis object
     rds = redis.Redis(host=options['redis'].hostname,
                       port=options['redis'].port,
                       password=options['redis'].password)
-    stats = Stats(redis_prefix, datastore=rds)
-    app = TaskEventApp(redis_prefix, options, stats, datastore=rds)
+    stats = Stats(prefix, datastore=rds)
+    app = TaskEventApp(prefix, options, stats, datastore=rds)
     signal.signal(signal.SIGTERM, signal_term_handler)
     app.run()
     # graceful shutdown via SIGTERM
