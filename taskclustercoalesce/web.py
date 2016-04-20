@@ -1,4 +1,3 @@
-import traceback
 import sys
 import os
 import flask
@@ -13,10 +12,6 @@ from flask_sslify import SSLify
 starttime = time.time()
 
 app = flask.Flask(__name__)
-handler = logging.StreamHandler(sys.stdout)
-app.logger.addHandler(handler)
-lvl = logging.DEBUG if os.getenv('DEBUG') == 'True' else logging.INFO
-app.logger.setLevel(lvl)
 
 if 'DYNO' in os.environ:
     app.wsgi_app = ProxyFix(app.wsgi_app)
@@ -24,27 +19,46 @@ if 'DYNO' in os.environ:
 
 
 def load_config(app):
+    # Set basic defaults
+    app.config.update(dict(
+        REDIS_URL="redis://localhost:6379",
+        PREFIX="coalesce.v1.",
+        DEBUG=False))
+
     # Valid environment types are Production, Testing, Development (Default)
     environment_type = os.getenv('ENVIRONMENT_TYPE', 'Development')
     app.logger.info('ENVIRONMENT_TYPE set to {0}'.format(environment_type))
     app.config.from_object('config.config.{0}'.format(environment_type))
+
+    # Override with environment vars if they exist
+    app.config.from_envvar('REDIS_URL', silent=True)
+    app.config.from_envvar('PREFIX', silent=True)
+    app.config.from_envvar('DEBUG', silent=True)
     return app
 
+
+def connect_redis(app):
+    redis_url = urlparse(app.config['REDIS_URL'])
+    app.redis = redis.Redis(host=redis_url.hostname,
+                            port=redis_url.port,
+                            password=redis_url.password,
+                            decode_responses=True)
+    return app
+
+
+def set_prefix(app):
+    app.prefix = app.config['PREFIX']
+    return app
+
+
+# Setup application
 app = load_config(app)
+app = connect_redis(app)
+app = set_prefix(app)
 
-
-pf = "coalesce.v1."
-
-try:
-    redis_url = urlparse(os.environ['REDIS_URL'])
-except KeyError:
-    traceback.print_exc()
-    sys.exit(1)
-
-rds = redis.Redis(host=redis_url.hostname,
-                  port=redis_url.port,
-                  password=redis_url.password,
-                  decode_responses=True)
+app.logger.addHandler(logging.StreamHandler(sys.stdout))
+lvl = logging.DEBUG if app.config['DEBUG'] == 'True' else logging.INFO
+app.logger.setLevel(lvl)
 
 
 @app.route('/')
@@ -60,7 +74,7 @@ def root():
 def ping():
     """ GET: return web process uptime """
     ping = {'alive': True, 'uptime': time.time() - starttime}
-    return jsonify(**ping)
+    return jsonify(ping)
 
 
 @app.route('/v1/list')
@@ -68,11 +82,11 @@ def coalasce_lists():
     """
     GET: returns a list of all coalesced objects load into the listener
     """
-    list_keys_set = rds.smembers(pf + "list_keys")
+    list_keys_set = app.redis.smembers(app.prefix + "list_keys")
     if len(list_keys_set) == 0:
-        return jsonify(**{pf: []})
+        return jsonify({app.prefix: []})
     list_keys = [x for x in list_keys_set]
-    return jsonify(**{pf: list_keys})
+    return jsonify({app.prefix: list_keys})
 
 
 @app.route('/v1/stats')
@@ -80,9 +94,9 @@ def stats():
     """
     GET: returns stats
     """
-    pf_key = pf + 'stats'
-    stats = rds.hgetall(pf_key)
-    return flask.jsonify(**stats)
+    prefix_key = app.prefix + 'stats'
+    stats = app.redis.hgetall(prefix_key)
+    return flask.jsonify(stats)
 
 
 @app.route('/v1/list/<key>')
@@ -90,9 +104,10 @@ def list(key):
     """
     GET: returns a list of ordered taskIds associated with the key provided
     """
-    pf_key = pf + 'lists.' + key
-    empty_resp = jsonify(**{'supersedes': []})
-    coalesced_list = rds.lrange(pf_key, start=0, end=-1)
+
+    prefix_key = app.prefix + 'lists.' + key
+    empty_resp = jsonify({'supersedes': []})
+    coalesced_list = app.redis.lrange(prefix_key, 0, -1)
 
     # Return empty resp if list is empty
     if len(coalesced_list) == 0:
@@ -108,26 +123,29 @@ def list(key):
         return empty_resp
 
     # Return empty resp if either age or size threshold are not defined
-    if not threshold_age or not threshold_size:
+    if threshold_age == None or threshold_size == None:
         app.logger.warning(
             "Key '{0}' is missing one or more threshold settings".format(key))
         return empty_resp
 
     # Return empty resp if taskid list is
     # less than or equal to the size threshold
-    if len(coalasce_lists) <= threshold_size:
+    if len(coalesced_list) <= threshold_size:
+        app.logger.warning("failed size test")
         return empty_resp
 
     # Get age of oldest taskid in the list
-    oldest_task_age = rds.get(pf + coalesced_list[-1] + '.timestamp')
+    oldest_task_age = app.redis.get(app.prefix +
+                                    coalesced_list[-1] + '.timestamp')
 
     # Return empty resp if age of the oldest taskid in list is
     # less than or equal to the age threshold
-    if (time.time() - oldest_task_age) <= threshold_age:
+    if (time.time() - float(oldest_task_age)) <= threshold_age:
+        app.logger.warning("Failed age test")
         return empty_resp
 
     # Thresholds have been exceeded. Return list for coalescing
-    return jsonify(**{'supersedes': coalesced_list})
+    return jsonify({'supersedes': coalesced_list})
 
 
 @app.route('/v1/threshold/<key>')
@@ -140,7 +158,7 @@ def threshold(key):
         # Age and/or size return None is unset but key exists
         age = app.config['THRESHOLDS'][key].get('age')
         size = app.config['THRESHOLDS'][key].get('size')
-        return jsonify(**{key: {'age': age, 'size': size}})
+        return jsonify({key: {'age': age, 'size': size}})
     return action_response('get_theshold', False, 404)
 
 
@@ -155,7 +173,7 @@ def list_thresholds():
 
 def action_response(action, success=True, status_code=200):
     """ Returns a stock json response """
-    resp = jsonify(**{'action': action, 'success': success})
+    resp = jsonify({'action': action, 'success': success})
     resp.status_code = status_code
     return resp
 
