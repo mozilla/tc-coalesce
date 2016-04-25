@@ -123,7 +123,7 @@ def list(key):
         return empty_resp
 
     # Return empty resp if either age or size threshold are not defined
-    if threshold_age == None or threshold_size == None:
+    if threshold_age is None or threshold_size is None:
         app.logger.warning(
             "Key '{0}' is missing one or more threshold settings".format(key))
         return empty_resp
@@ -131,7 +131,7 @@ def list(key):
     # Return empty resp if taskid list is
     # less than or equal to the size threshold
     if len(coalesced_list) <= threshold_size:
-        app.logger.warning("failed size test")
+        app.logger.debug("List does not meet size threshold")
         return empty_resp
 
     # Get age of oldest taskid in the list
@@ -141,7 +141,7 @@ def list(key):
     # Return empty resp if age of the oldest taskid in list is
     # less than or equal to the age threshold
     if (time.time() - float(oldest_task_age)) <= threshold_age:
-        app.logger.warning("Failed age test")
+        app.logger.debug("Oldest task in list does not meet age threshold")
         return empty_resp
 
     # Thresholds have been exceeded. Return list for coalescing
@@ -159,7 +159,7 @@ def threshold(key):
         age = app.config['THRESHOLDS'][key].get('age')
         size = app.config['THRESHOLDS'][key].get('size')
         return jsonify({key: {'age': age, 'size': size}})
-    return action_response('get_theshold', False, 404)
+    return action_response('get_threshold', False, 404)
 
 
 @app.route('/v1/threshold')
