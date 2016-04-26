@@ -15,8 +15,3 @@ class Development(Config):
 
 class Testing(Config):
     TESTING = True
-    THRESHOLDS = {
-        'test_key': {'size': 10, 'age': 120},
-        'test_key2': {'size': 10},
-        'test_key3': {'age': 120}
-        }
