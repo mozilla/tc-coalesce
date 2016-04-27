@@ -1,6 +1,9 @@
 class Config(object):
+    # All variables must be UPPERCASE
     DEBUG = False
     TESTING = False
+    REDIS_URL = "redis://localhost:6379"
+    PREFIX = "coalesce.v1."
     THRESHOLDS = {}
 
 

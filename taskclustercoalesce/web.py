@@ -18,27 +18,41 @@ if 'DYNO' in os.environ:
     SSLify(app, age=300, permanent=True)
 
 
-def load_config(app):
-    # Set basic defaults
-    app.config.update(dict(
-        REDIS_URL="redis://localhost:6379",
-        PREFIX="coalesce.v1.",
-        DEBUG=False))
+def setup_logging(app):
+    stream_handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter('[%(asctime)s] [%(process)d] ' +
+                                  '[%(levelname)s] %(message)s',
+                                  datefmt='%Y-%m-%d %H:%M:%S +0000')
+    stream_handler.setFormatter(formatter)
+    if os.getenv('DEBUG'):
+        app.logger.setLevel(logging.DEBUG)
+    else:
+        app.logger.setLevel(logging.INFO)
+    app.logger.addHandler(stream_handler)
+    return app
 
+
+def load_config(app):
+    # Load setting from config.py
     # Valid environment types are Production, Testing, Development (Default)
     environment_type = os.getenv('ENVIRONMENT_TYPE', 'Development')
     app.logger.info('ENVIRONMENT_TYPE set to {0}'.format(environment_type))
     app.config.from_object('config.config.{0}'.format(environment_type))
 
-    # Override with environment vars if they exist
-    app.config.from_envvar('REDIS_URL', silent=True)
-    app.config.from_envvar('PREFIX', silent=True)
-    app.config.from_envvar('DEBUG', silent=True)
+    # Override with select environment vars if they exist
+    if os.getenv('REDIS_URL'):
+        app.config['REDIS_URL'] = os.getenv('REDIS_URL')
+    if os.getenv('PREFIX'):
+        app.config['PREFIX'] = os.getenv('PREFIX')
+    if os.getenv('DEBUG'):
+        app.config['DEBUG'] = os.getenv('DEBUG')
     return app
 
 
 def connect_redis(app):
     redis_url = urlparse(app.config['REDIS_URL'])
+    app.logger.info('Connecting to Redis @ {0}'.format(
+                    app.config['REDIS_URL']))
     app.redis = redis.Redis(host=redis_url.hostname,
                             port=redis_url.port,
                             password=redis_url.password,
@@ -52,13 +66,10 @@ def set_prefix(app):
 
 
 # Setup application
+app = setup_logging(app)
 app = load_config(app)
 app = connect_redis(app)
 app = set_prefix(app)
-
-app.logger.addHandler(logging.StreamHandler(sys.stdout))
-lvl = logging.DEBUG if app.config['DEBUG'] == 'True' else logging.INFO
-app.logger.setLevel(lvl)
 
 
 @app.route('/')
