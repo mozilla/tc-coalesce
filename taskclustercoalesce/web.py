@@ -24,8 +24,10 @@ def setup_logging(app):
                                   '[%(levelname)s] %(message)s',
                                   datefmt='%Y-%m-%d %H:%M:%S +0000')
     stream_handler.setFormatter(formatter)
-    lvl = logging.DEBUG if os.getenv('DEBUG') is 'True' else logging.INFO
-    app.logger.setLevel(lvl)
+    if os.getenv('DEBUG'):
+        app.logger.setLevel(logging.DEBUG)
+    else:
+        app.logger.setLevel(logging.INFO)
     app.logger.addHandler(stream_handler)
     return app
 

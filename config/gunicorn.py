@@ -9,3 +9,5 @@ secure_scheme_headers = {
 
 if os.getenv('DEBUG'):
     loglevel = 'debug'
+else:
+    loglevel = 'info'
