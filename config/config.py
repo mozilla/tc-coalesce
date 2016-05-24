@@ -8,14 +8,12 @@ class Config(object):
 
 
 class Production(Config):
-    # TODO: Set actual threshold settings for production keys
     THRESHOLDS = {
         'builds.opt_linux64_pgo': {
             'size': 5,
             'age': 900
         }
     }
-    pass
 
 
 class Development(Config):
