@@ -9,7 +9,7 @@ class Config(object):
 
 class Production(Config):
     THRESHOLDS = {
-        'builds.opt_linux64_pgo': {
+        'builds.mozilla-inbound.linux64-pgo': {
             'size': 5,
             'age': 900
         }
