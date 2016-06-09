@@ -12,6 +12,14 @@ class Production(Config):
         'builds.mozilla-inbound.linux64-pgo': {
             'size': 5,
             'age': 900
+        },
+        'builds.mozilla-inbound.opt_linux32': {
+            'size': 5,
+            'age': 3600
+        },
+        'builds.mozilla-inbound.dbg_linux32': {
+            'size': 5,
+            'age': 3600
         }
     }
 
