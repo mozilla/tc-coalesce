@@ -1,0 +1,20 @@
+language: python
+python:
+  - 2.7
+
+install:
+  - pip install tox
+
+script:
+  - tox
+
+# The channel name "irc.mozilla.org#releng" is encrypted against mozilla/build-mozharness to prevent IRC spam of forks
+# Generated with: travis encrypt --repo mozilla/tc-coalesce --skip-version-check irc.mozilla.org#releng
+notifications:
+  irc:
+    channels:
+      - secure: "NueO+N2S0mdd+Ky6SwsHTTGSRVyeCZKpXwiUXKWQ6rIBDO47xWzVEMy6OC9eI0ar1hzREoqiQ+wAsp24uSxPnOIODBJ2ZubSCbVZ+6kJizjV46jU8iMRPaXsLyBMy4J7362N/IxjvS4uB2XvF7BlI4i6+r+9+//qAOU8iMRdEYVeKlTaE9Xb/4/RfLIfNEe6mc/HyCSO6Enw01TPvFqeSsBrhbUTnGXkMDHZKI9XrA+/z709U2H4lHXX5stWYAc2E8Grn09UPJijFpy9M8xjwMEmiBJzIL45o44GrvvrgL9Mk/m5QHsGw3hemCPHxK9E+kdR4pjtVoxT0amKkoc+sQpeVNZw4w/GhBvZc6Ne6TJAvckRmZROHtySXPRUY3byEwvDHb9+nbPuFmF8vTG4O49ayIuQVai1L2j7i/9hlQDDwda8ZWWQhh7uAqjRKIOqOiCoXCF6ycDItM8Ua6fK7nCPXWBd4Qb6OQ0HReZ8uM6l44IVWJ5mVCBycWnVjAM+uTzguYHOQNJnPajyKuCZR5CsfpEJE9FO0J4jAm63PQawnWKSs2iVbaVDyNrx4Wue/Ugz10lWsv3HFf4rbI3cVpspoda3MvMkuRZk15Df5ge0Ywjt9svLhumfabztggGhXVxthfXUjuedPQkl5BARI+rzf4XdF8zTcEffScGP5Ek="
+    on_success: always
+    on_failure: always
+    template:
+      - "\x02%{repository_name}\x0314#%{build_number}\x03\x02 (%{branch} - %{commit} : %{author}): \x02\x0312%{message}\x02\x03 (\x0314%{build_url}\x03)"

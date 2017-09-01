@@ -79,18 +79,29 @@ class WebTestCase(WebTestBase):
             self.assertEqual(rv.status_code, 200)
 
     def test_coalesce_task_list_empty(self):
-        rv = self.app.get('/v1/list/sample.key.emptylist')
+        rv = self.app.get('/v1/list/1/2/sample.key.emptylist')
         actual = json.loads(rv.data)
         expected = {'supersedes': []}
         self.assertEqual(self.ordered(actual), self.ordered(expected))
         self.assertEqual(rv.status_code, 200)
 
+    def test_invalid_path(self):
+        rv = self.app.get('/v1/monkey')
+        self.assertEqual(rv.status_code, 404)
+
+    def test_noninteger_age(self):
+        rv = self.app.get('/v1/list/notanumber/1/sample.key.emptylist')
+        self.assertEqual(rv.status_code, 404)
+
+    def test_noninteger_size(self):
+        rv = self.app.get('/v1/list/1/notanumber/sample.key.emptylist')
+        self.assertEqual(rv.status_code, 404)
+
     @patch('time.time')
     def test_coalesce_task_list_multi_meets_age_thresholds(self, m_time):
         m_time.return_value = 10
-        web.app.config['THRESHOLDS'] = {'sample.key.1': {'age': 5, 'size': 0}}
         with web.app.test_client() as c:
-            rv = c.get('/v1/list/sample.key.1')
+            rv = c.get('/v1/list/5/0/sample.key.1')
             actual = json.loads(rv.data)
             expected = {'supersedes': ['taskId1', 'taskId2', 'taskId3']}
             self.assertEqual(self.ordered(actual), self.ordered(expected))
@@ -99,9 +110,8 @@ class WebTestCase(WebTestBase):
     @patch('time.time')
     def test_coalesce_task_list_multi_not_meet_age_thresholds(self, m_time):
         m_time.return_value = 10
-        web.app.config['THRESHOLDS'] = {'sample.key.1': {'age': 20, 'size': 0}}
         with web.app.test_client() as c:
-            rv = c.get('/v1/list/sample.key.1')
+            rv = c.get('/v1/list/20/0/sample.key.1')
             actual = json.loads(rv.data)
             expected = {'supersedes': []}
             self.assertEqual(self.ordered(actual), self.ordered(expected))
@@ -110,9 +120,8 @@ class WebTestCase(WebTestBase):
     @patch('time.time')
     def test_coalesce_task_list_multi_meet_size_thresholds(self, m_time):
         m_time.return_value = 10
-        web.app.config['THRESHOLDS'] = {'sample.key.1': {'age': 5, 'size': 2}}
         with web.app.test_client() as c:
-            rv = c.get('/v1/list/sample.key.1')
+            rv = c.get('/v1/list/5/2/sample.key.1')
             actual = json.loads(rv.data)
             expected = {'supersedes': ['taskId1', 'taskId2', 'taskId3']}
             self.assertEqual(self.ordered(actual), self.ordered(expected))
@@ -121,9 +130,8 @@ class WebTestCase(WebTestBase):
     @patch('time.time')
     def test_coalesce_task_list_multi_not_meet_size_thresholds(self, m_time):
         m_time.return_value = 10
-        web.app.config['THRESHOLDS'] = {'sample.key.1': {'age': 5, 'size': 3}}
         with web.app.test_client() as c:
-            rv = c.get('/v1/list/sample.key.1')
+            rv = c.get('/v1/list/5/3/sample.key.1')
             actual = json.loads(rv.data)
             expected = {'supersedes': []}
             self.assertEqual(self.ordered(actual), self.ordered(expected))
@@ -146,37 +154,6 @@ class WebTestCase(WebTestBase):
             self.assertEqual(self.ordered(actual), self.ordered(expected))
             self.assertEqual(rv.status_code, 200)
 
-    def test_lookup_threshold_key_values(self):
-        threshold_obj = {'sample.key.2': {'age': 5, 'size': 8},
-                         'sample.key.3': {'age': 2, 'size': 3},
-                         'sample.key.4': {'age': 8, 'size': 2}}
-        web.app.config['THRESHOLDS'] = threshold_obj
-        with web.app.test_client() as c:
-            rv = c.get('/v1/threshold/sample.key.3')
-            actual = json.loads(rv.data)
-            expected = {'sample.key.3': {'age': 2, 'size': 3}}
-            self.assertEqual(self.ordered(actual), self.ordered(expected))
-            self.assertEqual(rv.status_code, 200)
-
-    def test_lookup_threshold_key_values_nonexist(self):
-        with web.app.test_client() as c:
-            rv = c.get('/v1/threshold/sample.key.1')
-            actual = json.loads(rv.data)
-            expected = {'action': 'get_threshold', 'success': False}
-            self.assertEqual(self.ordered(actual), self.ordered(expected))
-            self.assertEqual(rv.status_code, 404)
-
-    def test_show_threshold_object(self):
-        threshold_obj = {'sample.key.2': {'age': 5, 'size': 8},
-                         'sample.key.3': {'age': 2, 'size': 3},
-                         'sample.key.4': {'age': 8, 'size': 2}}
-        web.app.config['THRESHOLDS'] = threshold_obj
-        with web.app.test_client() as c:
-            rv = c.get('/v1/threshold')
-            actual = json.loads(rv.data)
-            expected = threshold_obj
-            self.assertEqual(self.ordered(actual), self.ordered(expected))
-            self.assertEqual(rv.status_code, 200)
 
 if __name__ == '__main__':
     unittest.main()

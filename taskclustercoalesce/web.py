@@ -110,10 +110,14 @@ def stats():
     return flask.jsonify(stats)
 
 
-@app.route('/v1/list/<key>')
-def list(key):
+@app.route('/v1/list/<int:age>/<int:size>/<key>')
+def list(age, size, key):
     """
-    GET: returns a list of ordered taskIds associated with the key provided
+    GET: returns a json object with the single property 'supersedes' which
+    contains either an ordered list of taskIds associated with <key>, when at
+    least one of those tasks is older than <age> seconds, and there are more
+    than <size> entries, otherwise if either of these criteria is not met, an
+    empty list.
     """
 
     prefix_key = app.prefix + 'lists.' + key
@@ -124,24 +128,9 @@ def list(key):
     if len(coalesced_list) == 0:
         return empty_resp
 
-    # Get threshold settings for key if key exists otherwise return empty resp
-    if app.config['THRESHOLDS'].get(key):
-        threshold_age = app.config['THRESHOLDS'][key].get('age')
-        threshold_size = app.config['THRESHOLDS'][key].get('size')
-    else:
-        app.logger.warning(
-            "Key '{0}' does not exist in threshold settings".format(key))
-        return empty_resp
-
-    # Return empty resp if either age or size threshold are not defined
-    if threshold_age is None or threshold_size is None:
-        app.logger.warning(
-            "Key '{0}' is missing one or more threshold settings".format(key))
-        return empty_resp
-
     # Return empty resp if taskid list is
     # less than or equal to the size threshold
-    if len(coalesced_list) <= threshold_size:
+    if len(coalesced_list) <= size:
         app.logger.debug("List does not meet size threshold")
         return empty_resp
 
@@ -151,35 +140,12 @@ def list(key):
 
     # Return empty resp if age of the oldest taskid in list is
     # less than or equal to the age threshold
-    if (time.time() - float(oldest_task_age)) <= threshold_age:
+    if (time.time() - float(oldest_task_age)) <= age:
         app.logger.debug("Oldest task in list does not meet age threshold")
         return empty_resp
 
     # Thresholds have been exceeded. Return list for coalescing
     return jsonify({'supersedes': coalesced_list})
-
-
-@app.route('/v1/threshold/<key>')
-def threshold(key):
-    """
-    GET: Returns an object containing the age and size threshold setting for
-    the key provided. Returns 200 on success, 404 if key does not exist
-    """
-    if app.config['THRESHOLDS'].get(key):
-        # Age and/or size return None is unset but key exists
-        age = app.config['THRESHOLDS'][key].get('age')
-        size = app.config['THRESHOLDS'][key].get('size')
-        return jsonify({key: {'age': age, 'size': size}})
-    return action_response('get_threshold', False, 404)
-
-
-@app.route('/v1/threshold')
-def list_thresholds():
-    """
-    GET: Returns an object containing all keys and their associated thresholds.
-    Returns 200 on success
-    """
-    return jsonify(app.config['THRESHOLDS'])
 
 
 def action_response(action, success=True, status_code=200):
