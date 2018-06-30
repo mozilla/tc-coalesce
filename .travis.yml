@@ -8,12 +8,12 @@ install:
 script:
   - tox
 
-# The channel name "irc.mozilla.org#releng" is encrypted against mozilla/build-mozharness to prevent IRC spam of forks
-# Generated with: travis encrypt --repo mozilla/tc-coalesce --skip-version-check irc.mozilla.org#releng
+# The channel name "irc.mozilla.org#releng-bots" is encrypted against mozilla/build-mozharness to prevent IRC spam of forks
+# Generated with: travis encrypt --repo mozilla/tc-coalesce --skip-version-check irc.mozilla.org#releng-bots
 notifications:
   irc:
     channels:
-      - secure: "NueO+N2S0mdd+Ky6SwsHTTGSRVyeCZKpXwiUXKWQ6rIBDO47xWzVEMy6OC9eI0ar1hzREoqiQ+wAsp24uSxPnOIODBJ2ZubSCbVZ+6kJizjV46jU8iMRPaXsLyBMy4J7362N/IxjvS4uB2XvF7BlI4i6+r+9+//qAOU8iMRdEYVeKlTaE9Xb/4/RfLIfNEe6mc/HyCSO6Enw01TPvFqeSsBrhbUTnGXkMDHZKI9XrA+/z709U2H4lHXX5stWYAc2E8Grn09UPJijFpy9M8xjwMEmiBJzIL45o44GrvvrgL9Mk/m5QHsGw3hemCPHxK9E+kdR4pjtVoxT0amKkoc+sQpeVNZw4w/GhBvZc6Ne6TJAvckRmZROHtySXPRUY3byEwvDHb9+nbPuFmF8vTG4O49ayIuQVai1L2j7i/9hlQDDwda8ZWWQhh7uAqjRKIOqOiCoXCF6ycDItM8Ua6fK7nCPXWBd4Qb6OQ0HReZ8uM6l44IVWJ5mVCBycWnVjAM+uTzguYHOQNJnPajyKuCZR5CsfpEJE9FO0J4jAm63PQawnWKSs2iVbaVDyNrx4Wue/Ugz10lWsv3HFf4rbI3cVpspoda3MvMkuRZk15Df5ge0Ywjt9svLhumfabztggGhXVxthfXUjuedPQkl5BARI+rzf4XdF8zTcEffScGP5Ek="
+      - secure: "LWyAoimAvXrJhltlEVHVUlHRLs5Thvq1FID09U/ZwKuVuX/Hp770gjBS8hu8s3bHI6p1OF5IgHb5P06LikJnd+OjJkPsvSKyvnxyeFbMoUkSdF98+t4Z/59GnYG904ID69OtQkh9E1rO7OvRq3n7SNm2EgEoZBCC9agf9Yyy7wExzUc8QscMcfE0XlrAurNF3TehAgGPAi6KwyHbLGeAsVDKWKVnWDLblAABOEpXG4bZOyffPUkIzhbeEnCq6mnxaFZKyjO7MrMUE5X01A3jWoDF/AuEeNpXDXBkuk2dMY9B1dS2OaaVzMbLnBjNiLNej5BQRJxzHdUc7zUP10/opFfqpKgqD/w+ewgesZAnQPyH7B4Xkp4ieesJgwz3yTgR6+/Un0pF/iDRkjTAmfBdh6c339NYQDBH02qeq8Wzhk4n/v5yeDKeMDBxcGnP7FmtFM2EXj0QrQDSv08YHikIWj+XPg70/BahtO3EuUSUsACpIzPYajiqolhobvWk1x3vvVlt+WL5b2zuJsbUtPL1dI1Xx7XHu8k1ysp6y7pfIefH4s19lqeNH7BfzJH8Uu+oGmuXzX9W5JZhC9C/Ru9x74JsMOXMklihMsnh6X6OvKv2dsjRfDWX3DW5/QTg6FiQre+eUf401QnGAwmOdjrJsluE/sS5GivX8x/eZWDeI2A="
     on_success: always
     on_failure: always
     template:
