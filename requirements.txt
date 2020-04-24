@@ -25,7 +25,7 @@ pyflakes==1.2.3
 PyHawk-with-a-single-extra-commit==0.1.5
 pytz==2016.4
 redis==2.10.5
-requests==2.10.0
+requests==2.20.0
 six==1.10.0
 slugid==1.0.7
 taskcluster==0.3.3
