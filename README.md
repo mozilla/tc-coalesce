@@ -1,3 +1,4 @@
+## This repository has been archived
 # Coalesce Service for Taskcluster
 
 This service is a Mozilla RelEng hosted service responsible for coalescing taskcluster tasks that are triggered when Firefox source code changes are pushed to the various __gecko__ repositories hosted on hg.mozilla.org.
